@@ -1,0 +1,26 @@
+uses
+	Core,
+	Draw,
+	CtrlCore,
+	CtrlLib,
+	Ui,
+	plugin/png;
+
+file
+	main.cpp,
+	../../UiSymbolPicker/SymbolPickerModel.h,
+	../../UiSymbolPicker/SymbolPickerCatalog.h,
+	../../UiSymbolPicker/SymbolPickerCatalog.cpp,
+	../../UiSymbolPicker/SymbolPickerCatalogSeed.h,
+	../../UiSymbolPicker/SymbolPickerCatalogSeed.cpp,
+	../../UiSymbolPicker/SymbolPickerGeneratedCatalog.h,
+	../../UiSymbolPicker/SymbolPickerGeneratedCatalog.cpp,
+	../../UiSymbolPicker/SymbolPickerImageRender.h,
+	../../UiSymbolPicker/SymbolPickerImageRender.cpp,
+	../../UiSymbolPicker/SymbolPickerExport.h,
+	../../UiSymbolPicker/SymbolPickerExport.cpp,
+	../../UiSymbolPicker/SymbolPickerUppExport.h,
+	../../UiSymbolPicker/SymbolPickerUppExport.cpp;
+
+mainconfig
+	"" = "CONSOLE";
