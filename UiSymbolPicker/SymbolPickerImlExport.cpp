@@ -53,7 +53,7 @@ static String WarningBlock(const Vector<String>& warnings)
 	return out + '\n';
 }
 
-static String EscapeCppString(const String& text)
+static String EscapeImlCppString(const String& text)
 {
 	String out;
 	for(int i = 0; i < text.GetCount(); ++i) {
@@ -151,7 +151,7 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 	String catalog_fn = "Get" + base + "Catalog";
 	String categories_fn = "Get" + base + "Categories";
 	String guard = "_SYMBOLPICKER_GENERATED_" + base + "_h_";
-	String quoted_iml = "\"" + EscapeCppString(GetFileName(iml_file_name)) + "\"";
+	String quoted_iml = "\"" + EscapeImlCppString(GetFileName(iml_file_name)) + "\"";
 
 	Index<String> categories;
 	for(const SymbolPickerImlEmission& emission : emissions)
@@ -180,9 +180,9 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 	out << "inline const " << catalog_type << "* " << catalog_fn << "(int& count)\n{\n"
 	       "\tstatic const " << catalog_type << " catalog[] = {\n";
 	for(const SymbolPickerImlEmission& emission : emissions) {
-		out << "\t\t{ \"" << EscapeCppString(emission.category) << "\", \""
-		    << EscapeCppString(emission.display_name) << "\", \""
-		    << EscapeCppString(emission.token) << "\", &" << emission.token << " },\n";
+		out << "\t\t{ \"" << EscapeImlCppString(emission.category) << "\", \""
+		    << EscapeImlCppString(emission.display_name) << "\", \""
+		    << EscapeImlCppString(emission.token) << "\", &" << emission.token << " },\n";
 	}
 	out << "\t};\n"
 	       "\tcount = (int)(sizeof(catalog) / sizeof(catalog[0]));\n"
@@ -191,7 +191,7 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 	out << "inline const char* const* " << categories_fn << "(int& count)\n{\n"
 	       "\tstatic const char* categories[] = {\n";
 	for(int i = 0; i < categories.GetCount(); ++i)
-		out << "\t\t\"" << EscapeCppString(categories[i]) << "\",\n";
+		out << "\t\t\"" << EscapeImlCppString(categories[i]) << "\",\n";
 	out << "\t};\n"
 	       "\tcount = (int)(sizeof(categories) / sizeof(categories[0]));\n"
 	       "\treturn categories;\n"
