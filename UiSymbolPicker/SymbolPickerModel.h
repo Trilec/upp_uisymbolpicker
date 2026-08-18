@@ -108,10 +108,24 @@ public:
 	bool IsValidCollectionIndex(int index) const;
 	bool IsValidItemIndex(int collection_index, int item_index) const;
 
+	int GetRevision() const { return revision_; }
+	int GetLibraryRevision() const { return library_revision_; }
+	int GetCollectionsRevision() const { return collections_revision_; }
+	int GetExportRevision() const { return export_revision_; }
+	int GetProjectRevision() const { return project_revision_; }
+
 	Event<> WhenChanged;
 
 private:
-	void Changed();
+	enum ChangeBits : dword {
+		CHANGE_NONE = 0,
+		CHANGE_LIBRARY = 1 << 0,
+		CHANGE_COLLECTIONS = 1 << 1,
+		CHANGE_EXPORT = 1 << 2,
+		CHANGE_PROJECT = 1 << 3,
+	};
+
+	void Changed(dword bits = CHANGE_NONE);
 
 	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
 	SymbolPickerIconStyle icon_style_ = SymbolPickerIconStyle::Outlined;
@@ -128,7 +142,15 @@ private:
 	String project_file_path_;
 	String output_base_name_ = "symbols";
 	String symbol_prefix_ = "ICON_";
+
+	int revision_ = 0;
+	int library_revision_ = 0;
+	int collections_revision_ = 0;
+	int export_revision_ = 0;
+	int project_revision_ = 0;
 };
+
+bool RunSymbolPickerModelRevisionSmokeTests(String& error);
 
 }
 

@@ -38,8 +38,17 @@ static SymbolPickerCollection CopyCollectionModel(const SymbolPickerCollection& 
 	return out;
 }
 
-void SymbolPickerModel::Changed()
+void SymbolPickerModel::Changed(dword bits)
 {
+	++revision_;
+	if(bits & CHANGE_LIBRARY)
+		++library_revision_;
+	if(bits & CHANGE_COLLECTIONS)
+		++collections_revision_;
+	if(bits & CHANGE_EXPORT)
+		++export_revision_;
+	if(bits & CHANGE_PROJECT)
+		++project_revision_;
 	WhenChanged();
 }
 
@@ -57,7 +66,7 @@ bool SymbolPickerModel::SetIconStyle(SymbolPickerIconStyle style)
 	if(icon_style_ == style)
 		return false;
 	icon_style_ = style;
-	Changed();
+	Changed(CHANGE_LIBRARY | CHANGE_PROJECT);
 	return true;
 }
 
@@ -69,17 +78,16 @@ bool SymbolPickerModel::SetCurrentCategory(const String& category)
 	if(current_category_ == next)
 		return false;
 	current_category_ = next;
-	Changed();
+	Changed(CHANGE_LIBRARY);
 	return true;
 }
 
 bool SymbolPickerModel::SetFilterText(const String& text)
 {
-	String next = text;
-	if(filter_text_ == next)
+	if(filter_text_ == text)
 		return false;
-	filter_text_ = next;
-	Changed();
+	filter_text_ = text;
+	Changed(CHANGE_LIBRARY);
 	return true;
 }
 
@@ -88,7 +96,7 @@ bool SymbolPickerModel::SetTintColor(Color color)
 	if(tint_color_ == color)
 		return false;
 	tint_color_ = color;
-	Changed();
+	Changed(CHANGE_LIBRARY | CHANGE_PROJECT);
 	return true;
 }
 
@@ -97,7 +105,7 @@ bool SymbolPickerModel::SetExportType(SymbolPickerExportType type)
 	if(export_type_ == type)
 		return false;
 	export_type_ = type;
-	Changed();
+	Changed(CHANGE_EXPORT);
 	return true;
 }
 
@@ -107,7 +115,7 @@ bool SymbolPickerModel::SetExportSize(int px)
 	if(export_size_ == next)
 		return false;
 	export_size_ = next;
-	Changed();
+	Changed(CHANGE_EXPORT | CHANGE_PROJECT);
 	return true;
 }
 
@@ -150,7 +158,7 @@ int SymbolPickerModel::CreateCollection(const String& name, const String& file_p
 	collection.dirty = true;
 	if(active_collection_index_ < 0)
 		active_collection_index_ = collections_.GetCount() - 1;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return collections_.GetCount() - 1;
 }
 
@@ -165,7 +173,7 @@ bool SymbolPickerModel::RemoveCollection(int index)
 		active_collection_index_ = collections_.GetCount() - 1;
 	else if(active_collection_index_ > index)
 		--active_collection_index_;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -174,13 +182,11 @@ bool SymbolPickerModel::RenameCollection(int index, const String& name)
 	if(!IsValidCollectionIndex(index))
 		return false;
 	String next = TrimBoth(name);
-	if(next.IsEmpty())
-		return false;
-	if(collections_[index].name == next)
+	if(next.IsEmpty() || collections_[index].name == next)
 		return false;
 	collections_[index].name = next;
 	collections_[index].dirty = true;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -190,13 +196,13 @@ bool SymbolPickerModel::SetActiveCollection(int index)
 		if(active_collection_index_ == -1)
 			return false;
 		active_collection_index_ = -1;
-		Changed();
+		Changed(CHANGE_COLLECTIONS);
 		return true;
 	}
 	if(!IsValidCollectionIndex(index) || active_collection_index_ == index)
 		return false;
 	active_collection_index_ = index;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -209,7 +215,7 @@ bool SymbolPickerModel::AddIconToCollection(int collection_index, const SymbolPi
 		copy.unresolved = true;
 	collections_[collection_index].items.Add(copy);
 	collections_[collection_index].dirty = true;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -219,7 +225,7 @@ bool SymbolPickerModel::RemoveIconFromCollection(int collection_index, int item_
 		return false;
 	collections_[collection_index].items.Remove(item_index);
 	collections_[collection_index].dirty = true;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -239,7 +245,7 @@ bool SymbolPickerModel::MoveIconInCollection(int collection_index, int from_inde
 		--to_index;
 	collections_[collection_index].items.Insert(to_index, moved);
 	collections_[collection_index].dirty = true;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -249,7 +255,7 @@ bool SymbolPickerModel::ClearCollection(int collection_index)
 		return false;
 	collections_[collection_index].items.Clear();
 	collections_[collection_index].dirty = true;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -257,12 +263,11 @@ bool SymbolPickerModel::RenameCollectionIconAlias(int collection_index, int item
 {
 	if(!IsValidItemIndex(collection_index, item_index))
 		return false;
-	String next = alias;
-	if(collections_[collection_index].items[item_index].alias == next)
+	if(collections_[collection_index].items[item_index].alias == alias)
 		return false;
-	collections_[collection_index].items[item_index].alias = next;
+	collections_[collection_index].items[item_index].alias = alias;
 	collections_[collection_index].dirty = true;
-	Changed();
+	Changed(CHANGE_COLLECTIONS);
 	return true;
 }
 
@@ -272,7 +277,7 @@ bool SymbolPickerModel::SetProjectName(const String& name)
 	if(project_name_ == next)
 		return false;
 	project_name_ = next;
-	Changed();
+	Changed(CHANGE_PROJECT);
 	return true;
 }
 
@@ -281,7 +286,7 @@ bool SymbolPickerModel::SetProjectComment(const String& comment)
 	if(project_comment_ == comment)
 		return false;
 	project_comment_ = comment;
-	Changed();
+	Changed(CHANGE_PROJECT);
 	return true;
 }
 
@@ -290,7 +295,7 @@ bool SymbolPickerModel::SetProjectFilePath(const String& path)
 	if(project_file_path_ == path)
 		return false;
 	project_file_path_ = path;
-	Changed();
+	Changed(CHANGE_PROJECT);
 	return true;
 }
 
@@ -302,7 +307,7 @@ bool SymbolPickerModel::SetOutputBaseName(const String& name)
 	if(output_base_name_ == next)
 		return false;
 	output_base_name_ = next;
-	Changed();
+	Changed(CHANGE_PROJECT);
 	return true;
 }
 
@@ -314,7 +319,7 @@ bool SymbolPickerModel::SetSymbolPrefix(const String& prefix)
 	if(symbol_prefix_ == next)
 		return false;
 	symbol_prefix_ = next;
-	Changed();
+	Changed(CHANGE_PROJECT);
 	return true;
 }
 
@@ -327,7 +332,7 @@ void SymbolPickerModel::MarkCollectionsSaved()
 			changed = true;
 		}
 	if(changed)
-		Changed();
+		Changed(CHANGE_COLLECTIONS);
 }
 
 SymbolPickerProject SymbolPickerModel::ExportProject() const
@@ -383,7 +388,7 @@ bool SymbolPickerModel::LoadProject(const SymbolPickerProject& project)
 	bin_icon_ids_.Clear();
 	current_category_ = "All";
 	filter_text_.Clear();
-	Changed();
+	Changed(CHANGE_LIBRARY | CHANGE_COLLECTIONS | CHANGE_EXPORT | CHANGE_PROJECT);
 	return true;
 }
 
@@ -407,6 +412,61 @@ bool SymbolPickerModel::IsValidItemIndex(int collection_index, int item_index) c
 	return IsValidCollectionIndex(collection_index)
 		&& item_index >= 0
 		&& item_index < collections_[collection_index].items.GetCount();
+}
+
+bool RunSymbolPickerModelRevisionSmokeTests(String& error)
+{
+	auto Fail = [&](const String& msg) {
+		error = msg;
+		return false;
+	};
+
+	SymbolPickerModel model;
+	int r0 = model.GetRevision();
+	int l0 = model.GetLibraryRevision();
+	int c0 = model.GetCollectionsRevision();
+	int e0 = model.GetExportRevision();
+	int p0 = model.GetProjectRevision();
+
+	if(!model.SetIconStyle(SymbolPickerIconStyle::Rounded))
+		return Fail("Model revision smoke could not change icon style.");
+	if(model.GetRevision() != r0 + 1 || model.GetLibraryRevision() != l0 + 1 ||
+	   model.GetCollectionsRevision() != c0 || model.GetExportRevision() != e0 || model.GetProjectRevision() != p0 + 1)
+		return Fail("Model revision smoke misclassified a library style change.");
+
+	int e1 = model.GetExportRevision();
+	int l1 = model.GetLibraryRevision();
+	if(!model.SetExportType(SymbolPickerExportType::CppSnippet))
+		return Fail("Model revision smoke could not change export type.");
+	if(model.GetExportRevision() != e1 + 1 || model.GetLibraryRevision() != l1)
+		return Fail("Model revision smoke misclassified an export-only change.");
+
+	int c1 = model.GetCollectionsRevision();
+	model.CreateCollection("Smoke");
+	if(model.GetCollectionsRevision() != c1 + 1)
+		return Fail("Model revision smoke did not advance collections revision.");
+
+	int p1 = model.GetProjectRevision();
+	if(!model.SetProjectName("Revision Smoke"))
+		return Fail("Model revision smoke could not change project name.");
+	if(model.GetProjectRevision() != p1 + 1)
+		return Fail("Model revision smoke did not advance project revision.");
+
+	SymbolPickerProject project = model.ExportProject();
+	int before_load_l = model.GetLibraryRevision();
+	int before_load_c = model.GetCollectionsRevision();
+	int before_load_e = model.GetExportRevision();
+	int before_load_p = model.GetProjectRevision();
+	if(!model.LoadProject(project))
+		return Fail("Model revision smoke could not reload project.");
+	if(model.GetLibraryRevision() != before_load_l + 1 ||
+	   model.GetCollectionsRevision() != before_load_c + 1 ||
+	   model.GetExportRevision() != before_load_e + 1 ||
+	   model.GetProjectRevision() != before_load_p + 1)
+		return Fail("Model revision smoke did not advance all channels on project load.");
+
+	error.Clear();
+	return true;
 }
 
 }
