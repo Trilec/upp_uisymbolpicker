@@ -1,6 +1,7 @@
 #include "SymbolPickerApp.h"
 #include "SymbolPickerImlExport.h"
 #include "SymbolPickerLibraryProjection.h"
+#include "SymbolPickerCollectionProjection.h"
 #include "SymbolPickerIconImageCache.h"
 
 namespace Upp {
@@ -21,6 +22,8 @@ bool SymbolPickerApp::Init(String& error)
 	if(used_seed_fallback_)
 		SeedSymbolPickerCatalog(catalog_);
 	if(!RunSymbolPickerLibraryProjectionSmokeTests(catalog_, error))
+		return false;
+	if(!RunSymbolPickerCollectionProjectionSmokeTests(catalog_, error))
 		return false;
 	if(!RunSymbolPickerIconImageCacheSmokeTests(catalog_, error))
 		return false;
