@@ -10,7 +10,10 @@ SymbolPickerIconImageCache::SymbolPickerIconImageCache()
 
 void SymbolPickerIconImageCache::SetMaxEntries(int max_entries)
 {
-	max_entries_ = max(64, max_entries);
+	// The generated catalog contains all style variants, but a browsing session
+	// normally exposes one style at a time. Keep one simple bounded working set
+	// rather than allowing callers to turn this into an unbounded image archive.
+	max_entries_ = clamp(max_entries, 64, 8192);
 	if(images_.GetCount() > max_entries_)
 		images_.Clear();
 }
@@ -74,7 +77,9 @@ bool RunSymbolPickerIconImageCacheSmokeTests(const SymbolPickerCatalog& catalog,
 		return Fail("Image-cache smoke test could not find an available icon.");
 
 	SymbolPickerIconImageCache cache;
-	cache.SetMaxEntries(8192);
+	cache.SetMaxEntries(20000);
+	if(cache.GetMaxEntries() != 8192)
+		return Fail("Image-cache smoke test did not retain the bounded 8192-entry working-set ceiling.");
 	Image first = cache.GetImage(*sample, 28, Black());
 	if(first.IsEmpty())
 		return Fail("Image-cache smoke test could not render sample icon.");
