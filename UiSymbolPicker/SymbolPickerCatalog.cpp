@@ -59,11 +59,24 @@ static Vector<SymbolPickerCategory> BuildCategories(const Vector<SymbolPickerIco
 void SymbolPickerCatalog::Clear()
 {
 	icons_.Clear();
+	catalog_index_.Clear();
+	source_index_.Clear();
 }
 
 void SymbolPickerCatalog::Add(const SymbolPickerIconEntry& entry)
 {
+	int index = icons_.GetCount();
 	icons_.Add(CopyEntry(entry));
+
+	if(!entry.catalog_id.IsEmpty()) {
+		int q = catalog_index_.Find(entry.catalog_id);
+		if(q < 0)
+			catalog_index_.Add(entry.catalog_id, index);
+		else
+			catalog_index_[q] = index;
+	}
+	if(!entry.source_id.IsEmpty() && source_index_.Find(entry.source_id) < 0)
+		source_index_.Add(entry.source_id, index);
 }
 
 const Vector<SymbolPickerIconEntry>& SymbolPickerCatalog::GetIcons() const
@@ -106,18 +119,20 @@ Vector<int> SymbolPickerCatalog::Filter(const String& category,
 
 const SymbolPickerIconEntry* SymbolPickerCatalog::FindByCatalogId(const String& catalog_id) const
 {
-	for(const auto& icon : icons_)
-		if(icon.catalog_id == catalog_id)
-			return &icon;
-	return nullptr;
+	int q = catalog_index_.Find(catalog_id);
+	if(q < 0)
+		return nullptr;
+	int index = catalog_index_[q];
+	return index >= 0 && index < icons_.GetCount() ? &icons_[index] : nullptr;
 }
 
 const SymbolPickerIconEntry* SymbolPickerCatalog::FindBySourceId(const String& source_id) const
 {
-	for(const auto& icon : icons_)
-		if(icon.source_id == source_id)
-			return &icon;
-	return nullptr;
+	int q = source_index_.Find(source_id);
+	if(q < 0)
+		return nullptr;
+	int index = source_index_[q];
+	return index >= 0 && index < icons_.GetCount() ? &icons_[index] : nullptr;
 }
 
 bool RunSymbolPickerCatalogSmokeTests(String& error)
@@ -185,20 +200,27 @@ bool RunSymbolPickerCatalogSmokeTests(String& error)
 		if(icon.style == SymbolPickerIconStyle::Sharp && !save_sharp)
 			save_sharp = &icon;
 	}
-	if(!save_outlined)
-		return Fail("FindByCatalogId did not resolve outlined variant.");
-	if(!save_rounded)
-		return Fail("FindByCatalogId did not resolve rounded variant.");
-	if(!save_sharp)
-		return Fail("FindByCatalogId did not resolve sharp variant.");
+	if(!save_outlined || !save_rounded || !save_sharp)
+		return Fail("Catalog fixture is missing style variants.");
 
-	if(!catalog.FindBySourceId(save_outlined->source_id))
-		return Fail("FindBySourceId did not find existing id.");
+	const SymbolPickerIconEntry* by_catalog = catalog.FindByCatalogId(save_rounded->catalog_id);
+	if(!by_catalog || by_catalog->catalog_id != save_rounded->catalog_id || by_catalog->style != SymbolPickerIconStyle::Rounded)
+		return Fail("Indexed FindByCatalogId did not resolve the requested variant.");
+	const SymbolPickerIconEntry* by_source = catalog.FindBySourceId(save_outlined->source_id);
+	if(!by_source || by_source->source_id != save_outlined->source_id)
+		return Fail("Indexed FindBySourceId did not resolve the requested source.");
 	if(catalog.FindBySourceId("missing/id"))
 		return Fail("FindBySourceId should return null for missing id.");
 	if(catalog.FindByCatalogId("missing/id/outlined"))
 		return Fail("FindByCatalogId should return null for missing id.");
 
+	String saved_catalog_id = save_sharp->catalog_id;
+	String saved_source_id = save_sharp->source_id;
+	catalog.Clear();
+	if(!catalog.GetIcons().IsEmpty() || catalog.FindByCatalogId(saved_catalog_id) || catalog.FindBySourceId(saved_source_id))
+		return Fail("Catalog Clear() did not clear indexed lookup state.");
+
+	error.Clear();
 	return true;
 }
 

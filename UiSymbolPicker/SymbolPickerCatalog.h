@@ -39,6 +39,8 @@ public:
 
 private:
 	Vector<SymbolPickerIconEntry> icons_;
+	VectorMap<String, int> catalog_index_;
+	VectorMap<String, int> source_index_;
 };
 
 bool RunSymbolPickerCatalogSmokeTests(String& error);
