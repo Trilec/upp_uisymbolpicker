@@ -14,6 +14,8 @@ file
 	SymbolPickerCommands.cpp,
 	SymbolPickerCatalog.h,
 	SymbolPickerCatalog.cpp,
+	SymbolPickerLibraryProjection.h,
+	SymbolPickerLibraryProjection.cpp,
 	SymbolPickerCatalogSeed.h,
 	SymbolPickerCatalogSeed.cpp,
 	SymbolPickerGeneratedCatalog.h,

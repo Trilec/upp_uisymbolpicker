@@ -1,5 +1,6 @@
 #include "SymbolPickerApp.h"
 #include "SymbolPickerImlExport.h"
+#include "SymbolPickerLibraryProjection.h"
 
 namespace Upp {
 
@@ -18,6 +19,8 @@ bool SymbolPickerApp::Init(String& error)
 	used_seed_fallback_ = LoadGeneratedSymbolPickerCatalog(catalog_) <= 0;
 	if(used_seed_fallback_)
 		SeedSymbolPickerCatalog(catalog_);
+	if(!RunSymbolPickerLibraryProjectionSmokeTests(catalog_, error))
+		return false;
 	if(!RunSymbolPickerProjectIoSmokeTests(catalog_, error))
 		return false;
 	if(!RunSymbolPickerExportSmokeTests(catalog_, error))
