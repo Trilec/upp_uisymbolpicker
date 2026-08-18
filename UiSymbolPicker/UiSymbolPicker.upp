@@ -18,6 +18,8 @@ file
 	SymbolPickerLibraryProjection.cpp,
 	SymbolPickerCollectionProjection.h,
 	SymbolPickerCollectionProjection.cpp,
+	SymbolPickerGalleryScaleSmoke.h,
+	SymbolPickerGalleryScaleSmoke.cpp,
 	SymbolPickerCatalogSeed.h,
 	SymbolPickerCatalogSeed.cpp,
 	SymbolPickerGeneratedCatalog.h,
