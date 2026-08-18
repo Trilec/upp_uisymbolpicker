@@ -1,104 +1,126 @@
-# Supervisor Hand-off: SymbolPicker library icon display issue
+# Supervisor Hand-off: SymbolPicker model-driven Gallery baseline
 
-Status: handed off. Working tree is clean at HEAD `6a87f91` (which includes the
-`EscapeCppString` BLITZ fix). The app builds and opens in this state, but the
-underlying library-display issue below is NOT yet fixed.
+Status: **source migration complete; Windows acceptance pending**.
 
-## What the user reported
+Current source checkpoint at handoff: `36a5c77c9cc843edb393f54921ae8a88f167a0a8`.
 
-- With category **All** selected, only ~220-270 icons appear, but the catalog has
-  thousands.
-- Selecting **action** shows "Action (1716)" on the button but far fewer icons
-  in the grid.
-- The library status line showed "572 icons" while the grid appeared to show
-  fewer.
+Always refresh remote `main` before continuing; GitHub is authoritative.
 
-## Root cause (confirmed with a probe against the real generated data)
+## Problem that triggered the migration
 
-The catalog is large and counts are reported in two different ways:
+The generated catalog contains 15,171 entries: 5,057 source icons with Outlined, Rounded and Sharp variants. SymbolPicker presents one style at a time, so `All + style` should expose about 5,057 logical items.
 
-1. **Total catalog**: 15,171 entries = 5,057 source icons x 3 style variants
-   (Outlined / Rounded / Sharp). Each generated header (e.g.
-   `UiSymbolPicker/Generated/icons_action.h`) contains 572 rows per style, so
-   action = 1,716 entries across all styles but only **572 per style**.
+The retired view capped `All` at 240 because its architecture created one `ParentCtrl` tile (plus child Labels and gesture state) per logical icon inside a wrapping `UiBoxLayout`. Removing the cap caused thousands of controls and Flow-layout entries to be built before the window opened. Lazy SVG decode alone could not fix that.
 
-2. **`SymbolPickerCatalog::Filter(...)` only ever returns ONE style** (the model
-   holds a single `SymbolPickerIconStyle`, default Outlined). So "action +
-   Outlined" = 572 rows, "All + Outlined" = 5,057 rows.
+The model/catalog size was not the bottleneck. The eager Ctrl-per-item view was.
 
-3. **The view hard-caps the "All" case** in `SymbolPickerView.cpp`
-   (`RebuildLibraryTiles`):
+## Implemented replacement
 
-   ```cpp
-   static constexpr int kLibraryAllInitialLimit = 240;
-   bool limited_all = category == "All" && text.IsEmpty() && rows > 240;
-   int visible_count = limited_all ? min(rows, 240) : rows;
-   ```
+The production app now uses `SymbolPickerWorkspaceView`.
 
-   So selecting **All** only ever builds 240 tiles, even though the filter
-   matches 5,057. Status read "Showing 240 of 5057 icons". This is the main
-   "missing icons" bug.
+### Library
 
-4. **Category buttons count all styles** (`GetCategories()` counts every entry
-   regardless of style) so "Action (1716)" is misleading: the view will only
-   ever show 572 for that category.
+`SymbolPickerCatalog`
+→ `SymbolPickerLibraryProjection`
+→ `UiListModel`
+→ `SymbolPickerDragGallery` / `UiGallery`
+→ bounded visible `UiItemRenderImage` pool.
 
-## What was tried (all reverted)
+The complete active-style filter is exposed. There is no 240-item cap.
 
-1. Removed the `kLibraryAllInitialLimit = 240` cap so "All" builds the full
-   5,057-tile set.
-2. Added `SymbolPickerCatalog::GetCategories(SymbolPickerIconStyle)` and used
-   it in the view so buttons show per-style counts (e.g. "Action (572)",
-   "All (5057)").
-3. Made preview image decoding lazy (batch timer, decode visible tiles first),
-   because eager decoding of 5,057 SVGs at startup was also too slow.
+`UiModelItem.data` stores stable `catalog_id`, so Gallery selection survives projection rebuilds by semantic identity rather than filtered row number.
 
-### Result: the cap removal exposed a second, larger problem
+### Collections
 
-With the cap removed, **the window never appears**: the app pins a CPU core and
-no window handle is created for 90+ seconds. Cause: the very first library
-rebuild happens **inside `SymbolPickerApp::Init()`** — `Wire()` connects
-`model_.WhenChanged` to `view_.RefreshFromModel()`, and `SetProjectName(...)`
-in `Init` fires `WhenChanged` → `RefreshFromModel` → `RebuildLibraryTiles`,
-which runs **before `Run()` ever shows the window**. Building 5,057 tiles
-(each `SymbolPickerIconTile` = a `ParentCtrl` with two `Label` children) and
-laying them out in the `UiBoxLayout` Flow grid, plus their SVG decodes, blocks
-for 30-90s before the window appears.
+The active collection uses the same model/view principle:
 
-Lazy image decoding alone did NOT fix it: tile construction + Flow layout of
-5,057 items is itself too slow to do eagerly at startup. The prior 240-tile
-build was fast, which is why the capped version "comes up pretty quick".
+`SymbolPickerCollection`
+→ `SymbolPickerCollectionProjection`
+→ `UiListModel`
+→ `SymbolPickerDragGallery`.
 
-## Recommendation for the supervisor
+Filtered view rows retain the underlying collection item index for delete/reorder commands.
 
-The correct fix is to make the library grid **virtualized** so the number of
-created tiles is independent of catalog size:
+### Image work
 
-- Keep the full filtered row list (`catalog_->Filter(...)`) as the authoritative
-  set and derive the total scroll extent from its count.
-- Only create `SymbolPickerIconTile` controls for the visible viewport range
-  (plus a small buffer), reusing/rebuilding them on scroll, instead of building
-  all tiles eagerly in `RebuildLibraryTiles`.
-- Keep preview image decoding lazy (decode only for visible tiles; cache them).
-- Fix the "All" cap: remove `kLibraryAllInitialLimit` once virtualization makes
-  the count irrelevant, OR keep a small eager cap + "load more" only if
-  virtualization is deferred.
-- Make category button counts style-aware so the button number matches what the
-  grid shows (`GetCategories(SymbolPickerIconStyle)`), and make the "All"
-  button count consistent too.
+Rendered SVG previews are not built with the projection. `UiGallery::WhenVisibleRange` prepares only visible + overscan rows.
 
-## Files involved
+`SymbolPickerIconImageCache` is a simple bounded `VectorMap<String, Image>` keyed by catalog ID, preview size and tint. It has an 8,192-entry hard ceiling, large enough for one 5,057-item style without becoming an all-variants archive.
 
-- `UiSymbolPicker/SymbolPickerView.cpp` — `RebuildLibraryTiles`,
-  `RebuildCategoryButtons`, `kLibraryAllInitialLimit`, `UpdateLibraryStatus`.
-- `UiSymbolPicker/SymbolPickerView.h` — library tile members.
-- `UiSymbolPicker/SymbolPickerCatalog.h/.cpp` — `GetCategories()` /
-  `Filter(...)`.
-- Startup path: `UiSymbolPicker/SymbolPickerApp.cpp` `Init()`/`Wire()`.
+Catalog identity lookup is indexed instead of repeatedly scanning 15k entries.
 
-## Current state
+### Refresh scope
 
-- HEAD `6a87f91`, working tree clean, app builds and opens (with the 240-cap
-  behavior and the misleading all-style counts).
-- All experimental changes above were reverted. `git` history has no trace of
-  them (they were uncommitted).
+`SymbolPickerModel` has monotonic library/collections/export/project revisions. The workspace rebuilds only the affected projection/control group. Export changes do not rebuild the 5k library.
+
+### Interaction
+
+`UiGallery` owns selection, Ctrl/Shift selection, marquee, keyboard navigation, scrolling and zoom. `SymbolPickerDragGallery` only adds the existing drag gesture payload and capture-safe completion.
+
+Do not add Graph's spatial hash to Gallery. Gallery's uniform grid gives cheaper direct row/column arithmetic.
+
+### Project/export
+
+Save/load/export dialog and file-emission orchestration moved to `SymbolPickerFileActions`; the workspace is no longer a giant mixed presentation/file-action class.
+
+## Structural 5k regression
+
+`SymbolPickerGalleryScaleSmoke` runs against the real loaded generated catalog and checks structure rather than wall-clock timing:
+
+- generated active style exposes >=5,000 rows;
+- no 240 cap;
+- renderer pool is bounded by visible + overscan range;
+- Paint work is viewport-sized;
+- deep navigation reaches the final logical symbol;
+- stable catalog selection token survives projection rebuild;
+- projection rebuild uses bulk notifications rather than one notification per logical item.
+
+## Removed legacy source
+
+The repository no longer contains the old production path:
+
+- `SymbolPickerView.h/.cpp`
+- `SymbolPickerResponsiveLayout.cpp`
+- `SymbolPickerIconTile`
+- `SymbolPickerCollectionTile`
+- per-icon ScrollPanel/Flow population
+- `kLibraryAllInitialLimit`
+- the superseded library-only `SymbolPickerLibraryGallery` adapter.
+
+Do not restore these for compatibility; the app is still new and the Gallery model/view path is canonical.
+
+## Important published checkpoints
+
+- `8f4feb94...` style-aware category counts
+- `5b4defa8...` library projection
+- `3623c289...` lazy/simple image cache
+- `f7c52053...` collection projection + generic Gallery drag adapter
+- `7065f643...` file actions extracted
+- `78e6df46...` scoped model revisions
+- `259041d9...` indexed catalog identity
+- `b9b3fe3e...` production app switched to Gallery workspace
+- `08020420...` structural 5k regression
+- `52565abb...` retired tile view removed
+- `36a5c77c...` superseded adapter removed; image-cache ceiling hardened
+
+See `docs/ACTIVE_WORK.md` for exact recovery state and validation checklist.
+
+## Next action
+
+Do **not** redesign further before the first Windows build. Gary should build/launch current main against current `upp_Ui/main` and report mechanical compiler issues separately from substantive architecture/runtime findings.
+
+Acceptance must prove:
+
+- prompt startup;
+- ~5,057 `All + Outlined` logical symbols;
+- bounded renderer count;
+- smooth deep scrolling and lazy image fill;
+- style-aware counts/search;
+- multi-selection/marquee/zoom;
+- library-to-collection multi-drag;
+- collection reorder/delete;
+- Light/Dark and undo/redo;
+- basic Save/Load/export smoke;
+- clean Git hygiene.
+
+If visible image row updates show measurable scroll hitching, the next optimization should be a small shared `UiListModel` bulk-range update. Do not create another semantic cache/store or reintroduce item Ctrls.

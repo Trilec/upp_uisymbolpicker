@@ -1,5 +1,19 @@
 # UiSymbolPicker Changelog
 
+## Unreleased - Model-driven 5k Gallery convergence
+
+- Replaced the capped per-icon `ParentCtrl`/Flow library with `UiGallery` backed by a filtered `UiListModel` presentation projection.
+- Removed the 240-item `All` cap; the generated active-style library now exposes the complete ~5,057 logical symbols.
+- Migrated the active collection to the same model-driven Gallery pattern and retained underlying collection indexes for filtered delete/reorder operations.
+- Added a generic `SymbolPickerDragGallery` so drag gestures consume Gallery selection without one gesture/control object per logical symbol.
+- Added lazy visible-range preview preparation and a simple 8,192-entry rendered-image working cache; removed LRU scan/reindex churn.
+- Added indexed catalog-ID/source-ID lookup so virtual collection/image paths do not repeatedly scan the 15,171-entry catalog.
+- Made category counts style-aware, so category totals match the active style shown in the library.
+- Added scoped model revision channels so export/project-only changes do not rebuild the 5k library projection.
+- Extracted project/save/load/export orchestration into `SymbolPickerFileActions` and removed the retired monolithic tile view.
+- Added structural generated-catalog scale coverage for full 5k exposure, bounded renderer/Paint work, deep final-item navigation, stable selection tokens and bulk projection notifications.
+- Removed `SymbolPickerView`, `SymbolPickerResponsiveLayout`, `SymbolPickerIconTile`, `SymbolPickerCollectionTile`, the old library-only Gallery adapter and all capped-result state.
+
 ## 0.3.8 - Responsive section header sizing
 
 - Added width-aware SymbolPicker section-header sizing so wrapped Library/Collections action rows reserve their measured Flow height instead of being clipped by a one-line outer header.
