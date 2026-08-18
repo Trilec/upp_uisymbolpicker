@@ -33,6 +33,29 @@ static String CategoryDisplayName(const String& id)
 	return out;
 }
 
+static Vector<SymbolPickerCategory> BuildCategories(const Vector<SymbolPickerIconEntry>& icons,
+	bool filter_style, SymbolPickerIconStyle style)
+{
+	VectorMap<String, int> counts;
+	for(const auto& icon : icons) {
+		if(filter_style && icon.style != style)
+			continue;
+		counts.GetAdd(icon.category, 0)++;
+	}
+
+	Vector<SymbolPickerCategory> out;
+	for(int i = 0; i < counts.GetCount(); ++i) {
+		SymbolPickerCategory& c = out.Add();
+		c.id = counts.GetKey(i);
+		c.display_name = CategoryDisplayName(c.id);
+		c.icon_count = counts[i];
+	}
+	Sort(out, [](const SymbolPickerCategory& a, const SymbolPickerCategory& b) {
+		return ToLower(a.display_name) < ToLower(b.display_name);
+	});
+	return out;
+}
+
 void SymbolPickerCatalog::Clear()
 {
 	icons_.Clear();
@@ -50,21 +73,12 @@ const Vector<SymbolPickerIconEntry>& SymbolPickerCatalog::GetIcons() const
 
 Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories() const
 {
-	VectorMap<String, int> counts;
-	for(const auto& icon : icons_)
-		counts.GetAdd(icon.category, 0)++;
+	return BuildCategories(icons_, false, SymbolPickerIconStyle::Outlined);
+}
 
-	Vector<SymbolPickerCategory> out;
-	for(int i = 0; i < counts.GetCount(); ++i) {
-		SymbolPickerCategory& c = out.Add();
-		c.id = counts.GetKey(i);
-		c.display_name = CategoryDisplayName(c.id);
-		c.icon_count = counts[i];
-	}
-	Sort(out, [](const SymbolPickerCategory& a, const SymbolPickerCategory& b) {
-		return ToLower(a.display_name) < ToLower(b.display_name);
-	});
-	return out;
+Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories(SymbolPickerIconStyle style) const
+{
+	return BuildCategories(icons_, true, style);
 }
 
 Vector<int> SymbolPickerCatalog::Filter(const String& category,
@@ -132,6 +146,17 @@ bool RunSymbolPickerCatalogSmokeTests(String& error)
 	}
 	if(!has_action || !has_navigation || !has_alert)
 		return Fail("Catalog categories are missing expected seeded groups.");
+
+	Vector<SymbolPickerCategory> outlined_categories = catalog.GetCategories(SymbolPickerIconStyle::Outlined);
+	int outlined_total = 0;
+	int outlined_action = 0;
+	for(const auto& category : outlined_categories) {
+		outlined_total += category.icon_count;
+		if(category.id == "action")
+			outlined_action = category.icon_count;
+	}
+	if(outlined_total != 8 || outlined_action != 3)
+		return Fail("Catalog style-aware category counts failed.");
 
 	Vector<int> filtered_category = catalog.Filter("action", String(), SymbolPickerIconStyle::Outlined);
 	if(filtered_category.GetCount() != 3)

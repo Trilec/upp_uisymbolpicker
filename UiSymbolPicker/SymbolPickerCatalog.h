@@ -28,6 +28,7 @@ public:
 
 	const Vector<SymbolPickerIconEntry>& GetIcons() const;
 	Vector<SymbolPickerCategory> GetCategories() const;
+	Vector<SymbolPickerCategory> GetCategories(SymbolPickerIconStyle style) const;
 
 	Vector<int> Filter(const String& category,
 		const String& text,
