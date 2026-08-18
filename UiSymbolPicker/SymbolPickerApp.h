@@ -5,7 +5,7 @@
 #include "SymbolPickerCatalogSeed.h"
 #include "SymbolPickerProjectIo.h"
 #include "SymbolPickerExport.h"
-#include "SymbolPickerView.h"
+#include "SymbolPickerWorkspaceView.h"
 
 namespace Upp {
 
@@ -18,7 +18,7 @@ public:
 	SymbolPickerModel& GetModel() { return model_; }
 	SymbolPickerCatalog& GetCatalog() { return catalog_; }
 	SymbolPickerCommandStack& GetCommands() { return commands_; }
-	SymbolPickerView& GetView() { return view_; }
+	SymbolPickerWorkspaceView& GetView() { return view_; }
 
 private:
 	void Wire();
@@ -27,7 +27,7 @@ private:
 	SymbolPickerModel model_;
 	SymbolPickerCatalog catalog_;
 	SymbolPickerCommandStack commands_;
-	SymbolPickerView view_;
+	SymbolPickerWorkspaceView view_;
 	bool used_seed_fallback_ = false;
 };
 
