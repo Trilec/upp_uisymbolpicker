@@ -14,20 +14,19 @@ void SymbolPickerLibraryProjection::Rebuild(const SymbolPickerCatalog& catalog,
 	const String& text,
 	SymbolPickerIconStyle style)
 {
-	Vector<int> rows = catalog.Filter(category, text, style);
+	Vector<int> filtered = catalog.Filter(category, text, style);
+	Vector<int> rows;
 	Vector<UiModelItem> items;
-	items.Reserve(rows.GetCount());
+	rows.Reserve(filtered.GetCount());
+	items.Reserve(filtered.GetCount());
 
 	const Vector<SymbolPickerIconEntry>& icons = catalog.GetIcons();
-	for(int row : rows) {
+	for(int row : filtered) {
 		if(row < 0 || row >= icons.GetCount())
 			continue;
 		const SymbolPickerIconEntry& entry = icons[row];
-		UiModelItem item(entry.display_name, entry.catalog_id);
-		item.description = entry.category;
-		// Images deliberately remain empty here. The Gallery visible-range callback
-		// fills only viewport/overscan items through SymbolPickerIconImageCache.
-		items.Add(pick(item));
+		rows.Add(row);
+		items.Add(UiModelItem(entry.display_name, entry.catalog_id));
 	}
 
 	catalog_ = &catalog;
@@ -81,6 +80,8 @@ bool RunSymbolPickerLibraryProjectionSmokeTests(const SymbolPickerCatalog& catal
 		const UiModelItem& item = projection.Model().Get(i);
 		if(AsString(item.data) != entry->catalog_id || item.text != entry->display_name)
 			return Fail("Library projection did not preserve stable catalog identity.");
+		if(!item.description.IsEmpty())
+			return Fail("Library projection added redundant per-tile category text.");
 		if(!item.image.IsEmpty())
 			return Fail("Library projection eagerly prepared icon images.");
 	}
