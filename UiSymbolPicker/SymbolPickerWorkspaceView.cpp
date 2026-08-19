@@ -39,10 +39,10 @@ String SafeAliasPart(const String& text)
 		int c = (byte)text[i];
 		if(IsAlNum(c))
 			out.Cat(ToUpper((wchar)c));
-		else if(out.IsEmpty() || out.Top() != '_')
+        else if(out.IsEmpty() || out[out.GetCount() - 1] != '_')
 			out.Cat('_');
 	}
-	while(!out.IsEmpty() && out.Top() == '_')
+    while(!out.IsEmpty() && out[out.GetCount() - 1] == '_')
 		out.Trim(out.GetCount() - 1);
 	return out;
 }
