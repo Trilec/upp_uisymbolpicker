@@ -33,14 +33,18 @@ public:
 	SymbolPickerWorkspaceView();
 
 	void SetModel(SymbolPickerModel* model);
-	void SetCatalog(const SymbolPickerCatalog* catalog);
+	void SetCatalog(SymbolPickerCatalog* catalog);
 	void SetCommands(SymbolPickerCommandStack* commands);
 	void RefreshFromModel();
+	bool RunSearchSmokeTests(String& error);
 
 	SymbolPickerDragGallery& GetLibraryGallery() { return library_gallery_; }
 	SymbolPickerDragGallery& GetCollectionGallery() { return collection_gallery_; }
 
 private:
+	enum { TIMEID_LIBRARY_FILTER = TopWindow::TIMEID_COUNT,
+	       TIMEID_COLLECTION_FILTER, TIMEID_COUNT };
+
 	void BuildUi();
 	void BuildHeader();
 	void BuildCategories();
@@ -60,6 +64,9 @@ private:
 	void UpdateCollectionStatus();
 	void UpdateActionState();
 	void UpdateThemeButton();
+	void ApplyThemeState();
+	void Skin() override;
+	void SetLibraryAssetKind(int kind);
 
 	void PrepareLibraryImages(int first, int last);
 	void PrepareCollectionImages(int first, int last);
@@ -72,6 +79,8 @@ private:
 	void RemoveActiveCollection();
 	void ClearActiveCollection();
 	void RemoveSelectedCollectionItems();
+	void ToggleSelectedUsage();
+	bool ConfirmUsedRemoval(const SymbolPickerCollection& collection, const Vector<int>& indexes);
 	void AddLibrarySelectionToCollection(const String& primary_catalog_id);
 	void ReorderCollectionItem(const SymbolPickerGestureResult& result);
 	int GetCollectionDropInsertIndex(Point screen) const;
@@ -94,14 +103,18 @@ private:
 	UiBoxLayout header_ { UiDirection::H };
 	UiLabel app_title_;
 	UiLabel project_label_;
-	UiButton theme_button_;
-	UiButton help_button_;
-	UiButton exit_button_;
+	UiToolButton theme_button_;
+	UiButton utilities_button_;
+	One<TopWindow> utilities_window_;
+	UiToolButton help_button_;
+	One<TopWindow> help_window_;
+	UiToolButton exit_button_;
 
 	UiPanel categories_panel_;
 	UiBoxLayout categories_box_ { UiDirection::V };
 	UiBoxLayout categories_header_ { UiDirection::H };
 	UiLabel categories_title_;
+	UiButton symbols_view_, images_view_;
 	UiLineEdit categories_filter_;
 	UiScrollPanel categories_scroll_;
 	UiBoxLayout categories_flow_ { UiDirection::H };
@@ -116,6 +129,11 @@ private:
 	UiDropdown library_style_;
 	UiLabel tint_label_;
 	ColorPusher library_tint_;
+	UiButton library_zoom_in_;
+	UiButton import_assets_;
+	UiLineEdit library_zoom_;
+	UiButton library_zoom_out_;
+	UiLabel library_zoom_hint_;
 	UiLineEdit library_filter_;
 	SymbolPickerDragGallery library_gallery_;
 
@@ -126,6 +144,7 @@ private:
 	UiLabel collections_title_;
 	UiLabel collections_status_;
 	UiDropdown collections_selector_;
+	UiDropdown collection_asset_view_;
 	UiButton new_collection_;
 	UiButton remove_collection_;
 	UiSplitButton save_button_;
@@ -135,6 +154,7 @@ private:
 	UiDropdown export_type_;
 	UiButton copy_button_;
 	UiButton delete_items_;
+	UiButton mark_used_;
 	UiButton clear_collection_;
 	UiLineEdit collection_filter_;
 	SymbolPickerDragGallery collection_gallery_;
@@ -147,10 +167,13 @@ private:
 	SymbolPickerFileActions file_actions_;
 
 	SymbolPickerModel* model_ = nullptr;
-	const SymbolPickerCatalog* catalog_ = nullptr;
+	SymbolPickerCatalog* catalog_ = nullptr;
 	SymbolPickerCommandStack* commands_ = nullptr;
 
 	bool syncing_ = false;
+	bool ui_ready_ = false;
+	int library_asset_kind_ = 0;
+	int seen_active_collection_ = -2;
 	bool preparing_library_images_ = false;
 	bool preparing_collection_images_ = false;
 	bool suppress_refresh_ = false;

@@ -3,16 +3,22 @@
 #include "SymbolPickerProjectIo.h"
 #include "SymbolPickerUppExport.h"
 #include "SymbolPickerImlExport.h"
+#include "SymbolPickerCustomAssets.h"
+#include "SymbolPickerImageRender.h"
 
 namespace Upp {
 
 namespace {
 
-static const char *kProjectExtension = ".uppicons.json";
+static const char *kProjectExtension = ".symbolpicker";
 
 String StripProjectSuffixes(String path)
 {
 	String lower = ToLower(path);
+	if(lower.EndsWith(".symbolpicker")) {
+		path.Trim(path.GetCount() - 13);
+		lower = ToLower(path);
+	}
 	if(lower.EndsWith(".json")) {
 		path.Trim(path.GetCount() - 5);
 		lower = ToLower(path);
@@ -93,7 +99,7 @@ String WarningDetail(const Vector<String>& warnings, const String& folder)
 } // namespace
 
 void SymbolPickerFileActions::SetContext(SymbolPickerModel* model,
-	const SymbolPickerCatalog* catalog,
+	SymbolPickerCatalog* catalog,
 	SymbolPickerCommandStack* commands)
 {
 	model_ = model;
@@ -136,7 +142,7 @@ String SymbolPickerFileActions::MakeExportDefaultName(SymbolPickerExportScope sc
 	case SymbolPickerExportType::UppRawHeader: base << "_raw"; break;
 	case SymbolPickerExportType::UppRleHeader: base << "_rle"; break;
 	case SymbolPickerExportType::UppIml: base << "_iml"; break;
-	case SymbolPickerExportType::UppImlLibrary: return "UiIcons";
+	case SymbolPickerExportType::UppImlLibrary: return model_->GetOutputBaseName();
 	default: base << '_' << MakeExportTypeName(model_->GetExportType()); break;
 	}
 	return base;
@@ -181,7 +187,7 @@ void SymbolPickerFileActions::ValidateLoadedProject(SymbolPickerProject& project
 		collection.file_path = project.file_path;
 		collection.dirty = false;
 		for(auto& item : collection.items)
-			item.unresolved = !catalog_ || !catalog_->FindByCatalogId(item.catalog_id);
+			item.unresolved = !catalog_ || !catalog_->FindByCatalogId(item.catalog_id) || !catalog_->FindByCatalogId(item.catalog_id)->available;
 	}
 	if(project.active_collection_index < 0 || project.active_collection_index >= project.collections.GetCount())
 		project.active_collection_index = 0;
@@ -205,8 +211,10 @@ bool SymbolPickerFileActions::SaveProject(bool save_as)
 	String path = model_->GetProjectFilePath();
 	if(save_as || path.IsEmpty()) {
 		FileSel fs;
-		fs.Type("SymbolPicker project", "*.uppicons.json");
-		fs.DefaultExt("uppicons.json");
+		fs.Type("Symbol Picker project", "*.symbolpicker");
+		fs.Type("Legacy JSON project", "*.uppicons.json *.json");
+		fs.AllFilesType();
+		fs.DefaultExt("symbolpicker");
 		String dir = PreferredDialogDir(path);
 		fs.ActiveDir(dir);
 		String base_name = model_->GetProjectName();
@@ -248,7 +256,9 @@ bool SymbolPickerFileActions::LoadProject()
 	}
 
 	FileSel fs;
-	fs.Type("SymbolPicker project", "*.uppicons.json");
+	fs.Type("Symbol Picker project", "*.symbolpicker");
+		fs.Type("Legacy JSON project", "*.uppicons.json *.json");
+		fs.AllFilesType();
 	fs.ActiveDir(PreferredDialogDir(model_->GetProjectFilePath()));
 	if(!fs.ExecuteOpen(BuildProjectDialogTitle("Load")))
 		return false;
@@ -263,12 +273,53 @@ bool SymbolPickerFileActions::LoadProject()
 	if(project.project_name.IsEmpty())
 		project.project_name = GetFileTitle(path);
 	project.file_path = path;
+	catalog_->SetCustomAssets(project.custom_assets);
 	ValidateLoadedProject(project);
+	WhenCatalogChanged();
 	if(!model_->LoadProject(project))
 		return false;
 	commands_->Clear();
 	PromptOK(Format("Loaded project:\n%s", path));
 	return true;
+}
+
+bool SymbolPickerFileActions::ImportCustomAssets()
+{
+	FileSel fs;
+	fs.Type("SVG and images", "*.svg *.png *.jpg *.jpeg *.bmp *.gif");
+	fs.Multi();
+	fs.ActiveDir(PreferredDialogDir(model_->GetProjectFilePath()));
+	if(!fs.ExecuteOpen("Import SVG or images")) return false;
+	Vector<String> paths;
+	for(int i = 0; i < fs.GetCount(); ++i) paths.Add(fs[i]);
+	return ImportCustomFiles(paths);
+}
+
+bool SymbolPickerFileActions::ImportCustomFiles(const Vector<String>& paths)
+{
+	if(!model_ || !catalog_) return false;
+	Vector<SymbolPickerCustomAsset> accepted;
+	Vector<String> rejected;
+	for(const String& path : paths) {
+		if(!IsSymbolPickerAssetFile(path)) { rejected.Add(GetFileName(path)); continue; }
+		SymbolPickerIconEntry probe;
+		probe.external_file = GetFullPath(path);
+		if(RenderSymbolPickerIconImage(probe, 48, Null).IsEmpty()) { rejected.Add(GetFileName(path)); continue; }
+		auto& asset = accepted.Add();
+		asset.catalog_id = "custom/" + AsString(Random64());
+		asset.file_path = probe.external_file;
+		asset.display_name = GetFileTitle(path);
+	}
+	bool added = false;
+	for(const auto& asset : accepted) added = model_->AddCustomAsset(asset) || added;
+	if(!accepted.IsEmpty()) {
+		auto project = model_->ExportProject();
+		catalog_->SetCustomAssets(project.custom_assets);
+		WhenCatalogChanged();
+		model_->SetCurrentCategory(ToLower(GetFileExt(accepted.Top().file_path)) == ".svg" ? "SVG" : "Images");
+	}
+	if(!rejected.IsEmpty()) Exclamation("Could not read these SVG/image files:\n" + Join(rejected, "\n"));
+	return added;
 }
 
 bool SymbolPickerFileActions::CopyCurrentExportToClipboard()
@@ -371,7 +422,7 @@ bool SymbolPickerFileActions::ExportImlLibrary(SymbolPickerExportScope scope)
 	project.default_size = model_->GetExportSize();
 	Vector<String> warnings;
 	String iml_text, header_text;
-	if(!BuildSymbolPickerUppImlLibrary(project, *catalog_, scope, GetFileName(iml_path), iml_text, header_text, &warnings)) {
+	if(!BuildSymbolPickerUppImlLibrary(project, *catalog_, scope, iml_path, iml_text, header_text, &warnings)) {
 		PromptOK("No exportable items for the IML library.");
 		return false;
 	}

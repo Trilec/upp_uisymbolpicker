@@ -34,6 +34,8 @@ struct SymbolPickerIconRef : Moveable<SymbolPickerIconRef> {
 	SymbolPickerIconStyle style_override = SymbolPickerIconStyle::Outlined;
 	bool   has_style_override = false;
 	bool   unresolved = false;
+	bool   marked_used = false;
+	String usage_note;
 };
 
 struct SymbolPickerCollection : Moveable<SymbolPickerCollection> {
@@ -44,12 +46,21 @@ struct SymbolPickerCollection : Moveable<SymbolPickerCollection> {
 	bool                        dirty = false;
 };
 
+struct SymbolPickerCustomAsset : Moveable<SymbolPickerCustomAsset> {
+	String catalog_id;
+	String file_path;
+	String display_name;
+};
+
 struct SymbolPickerProject : Moveable<SymbolPickerProject> {
 	String                        project_name;
 	String                        comment;
 	String                        file_path;
 	String                        output_base_name;
 	String                        symbol_prefix;
+	bool                          shared_ui_catalog = false;
+	SymbolPickerExportType        default_export_type = SymbolPickerExportType::ImageCall;
+	Vector<SymbolPickerCustomAsset> custom_assets;
 	int                           default_size = 48;
 	Color                         default_tint = Null;
 	SymbolPickerIconStyle         default_style = SymbolPickerIconStyle::Outlined;
@@ -79,11 +90,13 @@ public:
 	bool MoveIconInCollection(int collection_index, int from_index, int to_index);
 	bool ClearCollection(int collection_index);
 	bool RenameCollectionIconAlias(int collection_index, int item_index, const String& alias);
+	bool SetCollectionIconUsed(int collection_index, int item_index, bool used);
 	bool SetProjectName(const String& name);
 	bool SetProjectComment(const String& comment);
 	bool SetProjectFilePath(const String& path);
 	bool SetOutputBaseName(const String& name);
 	bool SetSymbolPrefix(const String& prefix);
+	bool AddCustomAsset(const SymbolPickerCustomAsset& asset);
 	void MarkCollectionsSaved();
 	SymbolPickerProject ExportProject() const;
 	bool LoadProject(const SymbolPickerProject& project);
@@ -142,6 +155,8 @@ private:
 	String project_file_path_;
 	String output_base_name_ = "symbols";
 	String symbol_prefix_ = "ICON_";
+	bool shared_ui_catalog_ = false;
+	Vector<SymbolPickerCustomAsset> custom_assets_;
 
 	int revision_ = 0;
 	int library_revision_ = 0;

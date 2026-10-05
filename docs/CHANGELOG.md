@@ -1,119 +1,12 @@
-# UiSymbolPicker Changelog
+# Changelog
 
-## Unreleased - Model-driven 5k Gallery convergence
+## October 2026
 
-- Replaced the capped per-icon `ParentCtrl`/Flow library with `UiGallery` backed by a filtered `UiListModel` presentation projection.
-- Removed the 240-item `All` cap; the generated active-style library now exposes the complete ~5,057 logical symbols.
-- Migrated the active collection to the same model-driven Gallery pattern and retained underlying collection indexes for filtered delete/reorder operations.
-- Added a generic `SymbolPickerDragGallery` so drag gestures consume Gallery selection without one gesture/control object per logical symbol.
-- Added lazy visible-range preview preparation and a simple 8,192-entry rendered-image working cache; removed LRU scan/reindex churn.
-- Added indexed catalog-ID/source-ID lookup so virtual collection/image paths do not repeatedly scan the 15,171-entry catalog.
-- Made category counts style-aware, so category totals match the active style shown in the library.
-- Added scoped model revision channels so export/project-only changes do not rebuild the 5k library projection.
-- Extracted project/save/load/export orchestration into `SymbolPickerFileActions` and removed the retired monolithic tile view.
-- Added structural generated-catalog scale coverage for full 5k exposure, bounded renderer/Paint work, deep final-item navigation, stable selection tokens and bulk projection notifications.
-- Removed `SymbolPickerView`, `SymbolPickerResponsiveLayout`, `SymbolPickerIconTile`, `SymbolPickerCollectionTile`, the old library-only Gallery adapter and all capped-result state.
-
-## 0.3.8 - Responsive section header sizing
-
-- Added width-aware SymbolPicker section-header sizing so wrapped Library/Collections action rows reserve their measured Flow height instead of being clipped by a one-line outer header.
-- Kept the title cards and action clusters on the same outer header row; only the inner action clusters wrap.
-- Restored the compact Library Categories heading height and reduced the heading-to-category-flow gap so category buttons sit directly under the title/subtitle again.
-- Kept the responsive sizing local to SymbolPicker rather than changing shared `UiBoxLayout` behavior.
-
-## 0.3.7 - Theme, header flow, help, and export feedback polish
-
-- Restored the intended same-row Library and Collections header composition with the original expanding spacer and natural-width filters while retaining Flow wrapping inside the action clusters.
-- Synchronized the SymbolPicker dark toggle with `UiThemeMode` as well as the U++ skin so explicitly resolved `Ui` control styles now switch to their real dark equivalents.
-- Added medium-dark section/scroll surfaces in dark mode and white Library/Collection icon previews without changing stored/export tint values.
-- Re-resolve custom header, collection, dropdown, tool-button, and empty-state styles when switching appearance; key tool icons also use high-contrast dark-mode tinting.
-- Improved successful export feedback so the exported filename/result is prominent above a smaller path line, with optional warning/detail text below.
-- Expanded Help into a structured workflow guide covering categories, selection, collections, project save/load, export formats, and the paired U++ IML + header library workflow.
-
-## 0.3.6 - Selection, layout, and U++ library export refinements
-
-- Added Library Shift range selection and Ctrl+Shift additive visible-range selection to match Collections.
-- Canonicalized project Save As suffixes so `.uppicons`, `.json`, repeated `.uppicons`, and case variants resolve to exactly one `.uppicons.json` suffix.
-- Preselect save/export dialogs with a complete valid path instead of a filename at a virtual disk-selection location.
-- Made Library and Collections header/action layouts wrap with auto-resize so filter fields remain visible at narrower window widths.
-- Standardized successful export feedback around `Export complete`, with filename and path shown separately.
-- Added `U++ IML + Header Library`, producing a sibling `.iml` + `.h` pair from one deterministic emission pass.
-- Generated IML library headers expose icon wrappers, category/catalog metadata, and an opt-in one-translation-unit `iml_source.h` implementation switch.
-- Extended IML startup smoke coverage over paired IML/header generation and its U++ integration contract.
-
-## 0.3.5 - Collection and export acceptance repairs
-
-- Reject Library-to-Collection duplicate drops while allowing partial grouped drops and reporting skipped duplicates.
-- Keep logical collection selection synchronized after Delete so repeated deletion chains correctly.
-- Added Shift range selection, active-collection removal, blank-and-active collection creation, and a one-command Clear collection action.
-- Hardened `.uppicons.json` Save As handling and added explicit default extensions/file filters for U++ header and IML exports.
-- Clarified that U++ IML export is a single `.iml` payload; warning sidecars remain conditional on actual export warnings.
-- Wired the light/dark toggle through U++ runtime skin switching and made custom tile/drop colors theme-responsive.
-- Replaced the inert Help action with concise in-app workflow guidance.
-
-## 0.3.4 - Captured gesture stability
-
-- Added one explicit captured gesture tracker shared by library and collection tiles.
-- Intentional capture release no longer reports cancellation before completion.
-- Terminal results carry stable source identity and release screen position.
-- Added deterministic lifecycle smoke coverage, including 1,000 mixed cycles.
-- Added a mouse-transparent drag preview and multi-selection count.
-- Collection selection now updates tiles in place instead of destroying the active tile.
-- Filtered collection reorder now uses underlying collection item indexes.
-- Removed per-gesture tooltip registration churn; tile tooltips remain disabled.
-- Separated normal result/selection status from Debug-only timing and gesture evidence.
-- Suppressed broad model refresh for Bin-only additions.
-
-## 0.4.6
-
-- replaced the collection-only JSON stub with project-level `.uppicons.json` I/O
-- added `SymbolPickerProject` metadata and model snapshot import/export
-- wired Save / Save As / Load to real file dialogs in the runtime shell
-- added project JSON roundtrip smoke coverage at startup
-- kept export/header generation out of scope for this pass
-
-## 0.3.3
-
-- rebuilt `SymbolPickerView` around the Designer hierarchy
-- removed the old splitter/table/Bin-pane shell
-- moved runtime content into the three scroll-panel hosts
-- preserved model/catalog/command behavior
-- kept generated catalog loading paused
-
-## 0.3.2
-
-- fixed `SymbolPickerIconRef` copy paths to preserve `catalog_id`
-- strengthened command smoke tests for `catalog_id` / `source_id` preservation
-- clarified README around catalog identity
-
-## 0.3.1
-
-- added unique `catalog_id` per icon/style variant
-- fixed Library row identity so style variants no longer collapse
-
-## 0.3.0
-
-- added read-only `SymbolPickerCatalog`
-- added seeded catalog data
-- added category and library filtering
-- added Library-to-Bin and Library-to-Collection actions
-- added catalog smoke tests
-
-## 0.2.0
-
-- renamed selection model to Bin
-- separated theme preset from icon style
-- added `SymbolPickerIconRef` and `SymbolPickerCollection`
-- added Bin and Collection command helpers
-- added collection I/O stubs
-- added Library / Collections / Bin shell
-- added placeholder tint control
-- extended startup smoke tests for Bin and Collections
-
-## 0.1.0
-
-- created V1 package skeleton
-- added model-only app state
-- added undo/redo command stack
-- added startup smoke tests for command do/undo/redo
-- added minimal Ui-based window shell
+- Faster gallery browsing with lazy previews and the full catalogue available.
+- Improved search, zoom controls, compact tiles, category colours and themes.
+- Application collections with reference-based `.symbolpicker` projects.
+- Custom SVG and raster images with separate library and collection views.
+- Native utilities for catalogue downloads, comparison, staged updates and usage scans.
+- Improved help covering collections, export formats and application integration.
+- Shared Ui example collections with 71 base and 162 compatible icon names.
+- Expanded Material catalogue to 4,150 names across three styles.

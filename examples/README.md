@@ -1,13 +1,11 @@
-# Examples
+# Example collections
 
-Standalone usage and integration examples for UiSymbolPicker will live here.
+- `UiIconsBase.symbolpicker`: the initial 71-icon shared Ui base set.
+- `UiIcons.symbolpicker`: the compatible 162-icon shared Ui set.
+- `AppIcons.symbolpicker`: a small application collection for trying exports.
 
-There is no example package in this repository yet. The production package is
-`UiSymbolPicker` and the deterministic validation packages live under `../tests`.
+Open these through **Load project**. Save a copy for your application, then edit
+its collection and export into your application package. Projects contain asset
+references and settings rather than embedded artwork.
 
-Intended content for this directory, when added:
-
-- minimal code snippets that open a catalog, build a project, and run an export;
-- integration examples showing how to consume the exported U++ IML + header
-  library pair (e.g. `UiIcons.iml` / `UiIcons.h`) from another U++ package;
-- small reference projects that use `UiSymbolPicker` as an external dependency.
+See the [icon workflow](../docs/ICON_WORKFLOW.md) for export integration.

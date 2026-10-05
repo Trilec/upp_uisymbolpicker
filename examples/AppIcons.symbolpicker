@@ -1,0 +1,44 @@
+{
+  "format": "upp-symbol-picker",
+  "version": 1,
+  "project_name": "AppIcons",
+  "output_base_name": "AppIcons",
+  "symbol_prefix": "APP_",
+  "default_size": 48,
+  "default_tint": "",
+  "default_style": "outlined",
+  "active_collection_index": 0,
+  "collections": [
+    {
+      "name": "Application",
+      "comment": "Independent icons alongside the shared Ui library.",
+      "items": [
+        {
+          "catalog_id": "content/save/outlined",
+          "source_id": "content/save",
+          "alias": "APP_SAVE",
+          "size": 48,
+          "tint": "",
+          "comment": "Rebuilt at 48x48 from picker SVG. Existing public alias preserved.",
+          "unresolved": false,
+          "marked_used": false,
+          "usage_note": "",
+          "category_override": "Application"
+        },
+        {
+          "catalog_id": "action/search/outlined",
+          "source_id": "action/search",
+          "alias": "APP_SEARCH",
+          "size": 48,
+          "tint": "",
+          "comment": "Rebuilt at 48x48 from picker SVG. Existing public alias preserved.",
+          "unresolved": false,
+          "marked_used": false,
+          "usage_note": "",
+          "category_override": "Application"
+        }
+      ]
+    }
+  ],
+  "export_type": 8
+}

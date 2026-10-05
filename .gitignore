@@ -41,6 +41,8 @@
 
 # Build directories
 /build/
+/bin/windows-x64/*
+!/bin/windows-x64/.gitkeep
 build/
 Build/
 build-*/
@@ -68,3 +70,10 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Python script cache
+__pycache__/
+/tests
+
+# Local U++ assembly settings
+/github.var

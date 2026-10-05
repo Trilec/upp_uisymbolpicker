@@ -23,6 +23,8 @@ static SymbolPickerIconRef CopyIconRef(const SymbolPickerIconRef& src)
 	out.style_override = src.style_override;
 	out.has_style_override = src.has_style_override;
 	out.unresolved = src.unresolved;
+	out.marked_used = src.marked_used;
+	out.usage_note = src.usage_note;
 	return out;
 }
 
@@ -674,6 +676,26 @@ private:
 	String old_;
 };
 
+class SetIconUsedCommand final : public SymbolPickerCommand {
+public:
+	SetIconUsedCommand(int collection, int item, bool used) : collection_(collection), item_(item), used_(used) {}
+	bool Do(SymbolPickerModel& model) override {
+		if(!model.IsValidItemIndex(collection_, item_)) return false;
+		old_ = model.GetCollections()[collection_].items[item_].marked_used;
+		return model.SetCollectionIconUsed(collection_, item_, used_);
+	}
+	void Undo(SymbolPickerModel& model) override { model.SetCollectionIconUsed(collection_, item_, old_); }
+	String Label() const override { return "Mark icon usage"; }
+private:
+	int collection_, item_;
+	bool used_, old_ = false;
+};
+
+One<SymbolPickerCommand> MakeSymbolPickerSetIconUsedCommand(int collection, int item, bool used)
+{
+	return MakeOne<SetIconUsedCommand>(collection, item, used);
+}
+
 One<SymbolPickerCommand> MakeSymbolPickerSetThemePresetCommand(UiThemePreset preset)
 {
 	return MakeOne<SetThemePresetCommand>(preset);
@@ -1030,6 +1052,24 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 	if(!stack.Redo(model) || model.GetCollections().GetCount() != 1)
 		return Fail("RemoveCollection redo failed.");
 
+	SymbolPickerModel usage_model;
+	SymbolPickerCommandStack usage_stack;
+	usage_model.CreateCollection("Usage");
+	SymbolPickerIconRef usage_ref;
+	usage_ref.catalog_id = "usage/test/outlined";
+	usage_ref.usage_note = "Ui/UiButton.cpp";
+	usage_model.AddIconToCollection(0, usage_ref);
+	if(!usage_stack.Execute(MakeSymbolPickerSetIconUsedCommand(0, 0, true), usage_model)
+	|| !usage_model.GetCollections()[0].items[0].marked_used)
+		return Fail("Usage mark did not apply.");
+	if(!usage_stack.Undo(usage_model) || usage_model.GetCollections()[0].items[0].marked_used)
+		return Fail("Usage mark undo did not restore state.");
+	if(!usage_stack.Redo(usage_model) || !usage_model.GetCollections()[0].items[0].marked_used)
+		return Fail("Usage mark redo did not restore state.");
+	usage_stack.Execute(MakeSymbolPickerRemoveIconFromCollectionCommand(0, 0), usage_model);
+	if(!usage_stack.Undo(usage_model) || !usage_model.GetCollections()[0].items[0].marked_used
+	|| usage_model.GetCollections()[0].items[0].usage_note != "Ui/UiButton.cpp")
+		return Fail("Delete undo lost icon usage metadata.");
 	return true;
 }
 

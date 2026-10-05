@@ -14,7 +14,7 @@ public:
 	void Clear();
 	void Rebuild(const SymbolPickerCollection& collection,
 		const SymbolPickerCatalog& catalog,
-		const String& text);
+		const String& text, int kind = -1);
 
 	UiListModel& Model() { return model_; }
 	const UiListModel& Model() const { return model_; }

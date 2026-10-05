@@ -17,7 +17,7 @@ void SymbolPickerCollectionProjection::Clear()
 
 void SymbolPickerCollectionProjection::Rebuild(const SymbolPickerCollection& collection,
 	const SymbolPickerCatalog& catalog,
-	const String& text)
+	const String& text, int kind)
 {
 	Vector<int> indexes;
 	Vector<String> catalog_ids;
@@ -29,17 +29,22 @@ void SymbolPickerCollectionProjection::Rebuild(const SymbolPickerCollection& col
 	for(int i = 0; i < collection.items.GetCount(); ++i) {
 		const SymbolPickerIconRef& ref = collection.items[i];
 		const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(ref.catalog_id);
+		if(kind >= 0 && (!entry || !SymbolPickerMatchesAssetKind(*entry, kind))) continue;
 		String display = entry ? entry->display_name : String();
-		String title = TrimBoth(ref.alias);
+		String title = display;
 		if(title.IsEmpty())
-			title = !display.IsEmpty() ? display : ref.catalog_id;
-		String haystack = title + "\n" + display + "\n" + ref.catalog_id + "\n" + ref.source_id;
+			title = !ref.alias.IsEmpty() ? ref.alias : ref.catalog_id;
+		String haystack = title + "\n" + ref.alias + "\n" + ref.catalog_id + "\n" + ref.source_id;
 		if(!CollectionProjectionMatches(haystack, text))
 			continue;
 
 		UiModelItem item(title, i);
 		item.right_text = Format("%d px", ref.size);
-		if(ref.unresolved || !entry) {
+		if(ref.marked_used) {
+			item.has_metadata = true;
+			item.metadata_color = Color(59, 130, 246);
+		}
+		if(ref.unresolved || !entry || !entry->available) {
 			item.custom_ink_color = Color(226, 141, 0);
 			item.has_metadata = true;
 			item.metadata_color = Color(226, 141, 0);

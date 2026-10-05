@@ -1,0 +1,63 @@
+// Generated catalogue includes and table iteration.
+#include "icons_action.h"
+#include "icons_activitie.h"
+#include "icons_alert.h"
+#include "icons_android.h"
+#include "icons_audio_video.h"
+#include "icons_brand.h"
+#include "icons_busines.h"
+#include "icons_communicate.h"
+#include "icons_communication.h"
+#include "icons_content.h"
+#include "icons_device.h"
+#include "icons_editor.h"
+#include "icons_file.h"
+#include "icons_hardware.h"
+#include "icons_home.h"
+#include "icons_household.h"
+#include "icons_image.h"
+#include "icons_map.h"
+#include "icons_navigation.h"
+#include "icons_notification.h"
+#include "icons_place.h"
+#include "icons_privacy.h"
+#include "icons_search.h"
+#include "icons_social.h"
+#include "icons_text.h"
+#include "icons_toggle.h"
+#include "icons_transit.h"
+#include "icons_travel.h"
+#include "icons_ui_action.h"
+#include "icons_uncategorized.h"
+
+#define SYMBOLPICKER_GENERATED_ICON_TABLES(OP) \
+	OP(action) \
+	OP(activitie) \
+	OP(alert) \
+	OP(android) \
+	OP(audio_video) \
+	OP(brand) \
+	OP(busines) \
+	OP(communicate) \
+	OP(communication) \
+	OP(content) \
+	OP(device) \
+	OP(editor) \
+	OP(file) \
+	OP(hardware) \
+	OP(home) \
+	OP(household) \
+	OP(image) \
+	OP(map) \
+	OP(navigation) \
+	OP(notification) \
+	OP(place) \
+	OP(privacy) \
+	OP(search) \
+	OP(social) \
+	OP(text) \
+	OP(toggle) \
+	OP(transit) \
+	OP(travel) \
+	OP(ui_action) \
+	OP(uncategorized)

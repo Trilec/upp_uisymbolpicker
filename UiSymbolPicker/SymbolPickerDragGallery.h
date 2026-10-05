@@ -27,6 +27,8 @@ public:
 	Event<> WhenDragStart;
 	Event<Point> WhenDragMove;
 	Event<SymbolPickerGestureResult> WhenDragFinished;
+	Event<const Vector<String>&> WhenFilesDropped;
+	virtual void DragAndDrop(Point p, PasteClip& clip) override;
 
 	virtual void LeftDown(Point p, dword keyflags) override;
 	virtual void LeftDrag(Point p, dword keyflags) override;

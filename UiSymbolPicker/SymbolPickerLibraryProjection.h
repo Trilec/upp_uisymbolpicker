@@ -14,7 +14,7 @@ public:
 	void Rebuild(const SymbolPickerCatalog& catalog,
 		const String& category,
 		const String& text,
-		SymbolPickerIconStyle style);
+		SymbolPickerIconStyle style, int kind = -1);
 
 	UiListModel& Model() { return model_; }
 	const UiListModel& Model() const { return model_; }

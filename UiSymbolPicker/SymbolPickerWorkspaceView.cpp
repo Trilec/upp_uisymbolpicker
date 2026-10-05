@@ -1,12 +1,14 @@
 #include "SymbolPickerWorkspaceView.h"
+#include "SymbolPickerHelp.h"
+#include "Utilities/SymbolPickerUtilities.h"
 
 namespace Upp {
 
 namespace {
 
-static constexpr int kPreviewPx = 32;
-static constexpr int kLibraryFilterCallbackId = 8201;
-static constexpr int kCollectionFilterCallbackId = 8202;
+static constexpr int kPreviewPx = 24;
+
+
 
 UiLabel::Style HeadingStyle()
 {
@@ -20,6 +22,12 @@ UiLabel::Style StatusStyle()
 	UiLabel::Style style = UiTheme::ResolveLabel(UiRole::Subtle);
 	style.font = SansSerifZ(9);
 	return style;
+}
+
+Color CategoryTint(int index, int count)
+{
+	return Blend(Color(255, 218, 183), Color(183, 219, 250),
+	             count > 1 ? 255 * index / (count - 1) : 0);
 }
 
 const char* IconStyleText(SymbolPickerIconStyle style)
@@ -51,6 +59,23 @@ bool MatchText(const String& haystack, const String& filter)
 {
 	String needle = ToLower(TrimBoth(filter));
 	return needle.IsEmpty() || ToLower(haystack).Find(needle) >= 0;
+}
+
+bool PromptCollectionName(String& name)
+{
+	TopWindow dialog; dialog.Title("New application collection"); dialog.SetRect(0, 0, DPI(460), DPI(220));
+	UiBoxLayout root(UiDirection::V), buttons(UiDirection::H);
+	UiTitleCard title; UiLineEdit edit; UiButton create, cancel;
+	root.SetInset(DPI(16)).SetGap(DPI(12)); dialog.Add(root.SizePos());
+	title.SetTitle("New collection").SetSubTitle("Keep one application's icons and images together").SetSelectable(false);
+	edit.SetData(name); edit.SetPlaceholder("Application or collection name");
+	create.SetText("Create"); cancel.SetText("Cancel");
+	create.WhenAction = [&] { if(!TrimBoth(AsString(edit.GetData())).IsEmpty()) dialog.AcceptBreak(IDOK); };
+	edit.WhenAction = create.WhenAction; cancel.WhenAction = [&] { dialog.Break(IDCANCEL); };
+	buttons.SetGap(DPI(10)); buttons.AddSpacer(1).Expand(1); buttons.Add(cancel).Fit(); buttons.Add(create).Fit();
+	root.Add(title).Fit(); root.Add(edit).Fixed(DPI(32)); root.AddSpacer(1).Expand(1); root.Add(buttons).Fixed(DPI(34));
+	edit.SetFocus(); if(dialog.Run() != IDOK) return false;
+	name = TrimBoth(AsString(edit.GetData())); return !name.IsEmpty();
 }
 
 } // namespace
@@ -101,6 +126,7 @@ SymbolPickerWorkspaceView::SymbolPickerWorkspaceView()
 	BuildUi();
 	ConfigureGalleryRenderers();
 	WireActions();
+	ui_ready_ = true;
 	UpdateThemeButton();
 }
 
@@ -124,30 +150,37 @@ void SymbolPickerWorkspaceView::BuildUi()
 
 void SymbolPickerWorkspaceView::BuildHeader()
 {
-	header_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	header_.SetDirection(UiDirection::H).SetGap(DPI(15)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 	app_title_.SetCustomStyle(HeadingStyle()).SetText("Symbol Picker");
 	project_label_.SetCustomStyle(StatusStyle()).SetText("Model-driven icon workspace");
-	theme_button_.SetText("Dark");
-	help_button_.SetText("Help");
-	exit_button_.SetText("Exit");
+	theme_button_.SetIcon(ICON_ACTION_DARK_MODE_48()).SetIconSize(DPI(16), DPI(16)).Tip("theme");
+	utilities_button_.SetText("Utilities").Tip("Compare/download the symbol catalogue, or scan collection usage");
+	help_button_.SetIcon(ICON_DESIGN_HELP_48()).SetIconSize(DPI(16), DPI(16)).Tip("help");
+	exit_button_.SetIcon(ICON_DESIGN_MODE_OFF_ON_48()).SetIconSize(DPI(16), DPI(16)).Tip("exit");
 
 	header_.Add(app_title_).Fit().MinMain(DPI(120));
 	header_.Add(project_label_).Fit().MinMain(DPI(220));
 	header_.AddSpacer(1).Expand(1).MinMain(DPI(10));
-	header_.Add(theme_button_).Fixed(DPI(64));
-	header_.Add(help_button_).Fixed(DPI(64));
-	header_.Add(exit_button_).Fixed(DPI(64));
+	header_.Add(theme_button_).Fixed(DPI(34));
+	header_.Add(utilities_button_).Fit();
+	header_.Add(help_button_).Fixed(DPI(34));
+	header_.Add(exit_button_).Fixed(DPI(34));
 }
 
 void SymbolPickerWorkspaceView::BuildCategories()
 {
 	categories_panel_.Add(categories_box_.SizePos());
 	categories_box_.SetDirection(UiDirection::V).SetGap(DPI(5)).SetInset(DPI(7));
-	categories_header_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	categories_header_.SetDirection(UiDirection::H).SetGap(DPI(15)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 	categories_title_.SetCustomStyle(HeadingStyle()).SetText("Categories");
+	symbols_view_.SetText("Icons / SVG").SetCheckable(true).SetChecked(true);
+	images_view_.SetText("Images / PNG").SetCheckable(true);
+	images_view_.Tip("Raster images: PNG, JPEG, BMP and GIF. Separate from the Material Image icon category.");
 	categories_filter_.SetPlaceholder("Filter categories");
 
 	categories_header_.Add(categories_title_).Fit().MinMain(DPI(120));
+	categories_header_.Add(symbols_view_).Fit();
+	categories_header_.Add(images_view_).Fit();
 	categories_header_.AddSpacer(1).Expand(1).MinMain(DPI(8));
 	categories_header_.Add(categories_filter_).Fit().MinMain(DPI(190));
 
@@ -168,13 +201,13 @@ void SymbolPickerWorkspaceView::BuildLibrary()
 {
 	library_panel_.Add(library_box_.SizePos());
 	library_box_.SetDirection(UiDirection::V).SetGap(DPI(6)).SetInset(DPI(7));
-	library_header_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	library_header_.SetDirection(UiDirection::H).SetGap(DPI(15)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 	library_actions_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0)
 	                .SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetAlignItems(UiCrossAlign::Center);
 
 	library_title_.SetCustomStyle(HeadingStyle()).SetText("Library");
 	library_status_.SetCustomStyle(StatusStyle()).SetText("No catalog loaded");
-	library_header_.Add(library_title_).Fit().MinMain(DPI(90));
+	library_header_.Add(library_title_).Fit().MinMain(DPI(320));
 	library_header_.Add(library_status_).Expand(1).MinMain(DPI(220));
 
 	library_style_.UseInternalModel().Clear()
@@ -184,19 +217,29 @@ void SymbolPickerWorkspaceView::BuildLibrary()
 	library_style_.SetSizeMin(DPI(118), 0);
 	tint_label_.SetText("Tint");
 	library_tint_ <<= Black();
+	library_zoom_in_.SetText("+").Tip("Zoom in");
+	library_zoom_out_.SetText("−").Tip("Zoom out");
+	library_zoom_.SetTextUtf8("100%").Tip("Zoom percentage; press Enter to apply");
+	library_zoom_hint_.SetCustomStyle(StatusStyle()).SetText("Ctrl + wheel to zoom");
 	library_filter_.SetPlaceholder("Search symbols");
+	import_assets_.SetText("Import…").Tip("Add SVG or image files to the library; the project keeps file references.");
 
 	library_actions_.Add(library_style_).Fit().MinMain(DPI(118));
 	library_actions_.Add(tint_label_).Fit();
 	library_actions_.Add(library_tint_).Fixed(DPI(42)).MinCross(DPI(24));
+	library_actions_.Add(library_zoom_in_).Fixed(DPI(30));
+	library_actions_.Add(library_zoom_).Fixed(DPI(64));
+	library_actions_.Add(library_zoom_out_).Fixed(DPI(30));
+	library_actions_.Add(library_zoom_hint_).Fit().MinMain(DPI(145));
+	library_actions_.Add(import_assets_).Fixed(DPI(76));
 	library_actions_.AddSpacer(1).Expand(1).MinMain(DPI(8));
 	library_actions_.Add(library_filter_).Expand(1).MinMain(DPI(220));
 
 	library_gallery_.SetDragSource(SymbolPickerGestureSourceKind::Library)
 	                .SetModel(library_projection_.Model())
 	                .SetSelectionMode(UIGALLERYSEL_MULTI)
-	                .SetItemSize(Size(DPI(92), DPI(92)))
-	                .SetGap(DPI(6))
+	                .SetItemSize(Size(DPI(64), DPI(56)))
+	                .SetGap(DPI(4))
 	                .SetInset(DPI(6))
 	                .SetOverscanRows(2)
 	                .SetZoomRange(0.62, 1.75, 1.12);
@@ -210,7 +253,7 @@ void SymbolPickerWorkspaceView::BuildCollections()
 {
 	collections_panel_.Add(collections_box_.SizePos());
 	collections_box_.SetDirection(UiDirection::V).SetGap(DPI(6)).SetInset(DPI(7));
-	collections_header_.SetDirection(UiDirection::H).SetGap(DPI(8)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
+	collections_header_.SetDirection(UiDirection::H).SetGap(DPI(15)).SetInset(0).SetAlignItems(UiCrossAlign::Center);
 	collections_actions_.SetDirection(UiDirection::H).SetGap(DPI(6)).SetInset(0)
 	                    .SetWrap(UiBoxWrap::Flow).SetWrapAutoResize(true).SetAlignItems(UiCrossAlign::Center);
 
@@ -253,6 +296,7 @@ void SymbolPickerWorkspaceView::BuildCollections()
 	copy_button_.Tip("Copy current text export");
 	delete_items_.SetText("Delete");
 	delete_items_.Tip("Remove selected collection items");
+	mark_used_.SetText("Mark used").Tip("Toggle the usage warning for selected icons; blue dot means marked used");
 	clear_collection_.SetText("Clear");
 	clear_collection_.Tip("Clear active collection");
 	collection_filter_.SetPlaceholder("Filter collection");
@@ -267,19 +311,22 @@ void SymbolPickerWorkspaceView::BuildCollections()
 	collections_actions_.Add(export_type_).Fit().MinMain(DPI(170));
 	collections_actions_.Add(copy_button_).Fixed(DPI(66));
 	collections_actions_.Add(delete_items_).Fixed(DPI(72));
+	collections_actions_.Add(mark_used_).Fixed(DPI(90));
 	collections_actions_.Add(clear_collection_).Fixed(DPI(64));
 	collections_actions_.Add(collection_filter_).Expand(1).MinMain(DPI(170));
 
 	collection_gallery_.SetDragSource(SymbolPickerGestureSourceKind::Collection)
 	                   .SetModel(collection_projection_.Model())
 	                   .SetSelectionMode(UIGALLERYSEL_MULTI)
-	                   .SetItemSize(Size(DPI(176), DPI(82)))
-	                   .SetGap(DPI(6))
+	                   .SetItemSize(Size(DPI(64), DPI(56)))
+	                   .SetGap(DPI(4))
 	                   .SetInset(DPI(6))
 	                   .SetOverscanRows(2)
 	                   .SetZoomRange(0.72, 1.55, 1.12);
 
 	collections_box_.Add(collections_header_).Fit();
+	collection_asset_view_.Add("All assets", -1).Add("Icons / SVG", 0).Add("Images / PNG", 1).SetDataSilently(-1);
+	collections_header_.Add(collection_asset_view_).Fixed(DPI(150));
 	collections_box_.Add(collections_actions_).Fit();
 	collections_box_.Add(collection_gallery_).Expand(1);
 }
@@ -288,8 +335,15 @@ void SymbolPickerWorkspaceView::ConfigureGalleryRenderers()
 {
 	UiItemRenderImage library_render;
 	UiItemRenderStyle library_style = library_render.GetStyle();
-	library_style.image_extent = DPI(36);
-	library_style.title_font = SansSerifZ(9);
+	library_style.image_extent = DPI(24);
+	library_style.title_font = SansSerifZ(8);
+	library_style.skin = StyledSkin();
+	library_style.metrics.content_margin = Rect(DPI(3), DPI(3), DPI(3), DPI(4));
+	library_style.metrics.radius = DPI(4);
+	library_style.metrics.face_enabled = true;
+	library_style.palette.face[ST_PRESSED] = UiFill::Solid(Color(96, 165, 250));
+	library_style.palette.frame[ST_PRESSED] = Color(37, 99, 235);
+	library_style.palette.ink[ST_PRESSED] = Color(15, 23, 42);
 	library_style.show_description = false;
 	library_style.show_right_text = false;
 	library_style.show_metadata = false;
@@ -298,42 +352,78 @@ void SymbolPickerWorkspaceView::ConfigureGalleryRenderers()
 	library_gallery_.SetItemRender(library_render);
 
 	UiItemRenderImage collection_render;
-	UiItemRenderStyle collection_style = collection_render.GetStyle();
-	collection_style.image_extent = DPI(32);
-	collection_style.title_font = SansSerifZ(9);
-	collection_style.right_font = SansSerifZ(8);
-	collection_style.show_description = false;
-	collection_style.show_right_text = true;
-	collection_style.show_metadata = true;
-	collection_style.content_gap = DPI(5);
-	collection_render.SetCustomStyle(collection_style);
+	library_style.show_metadata = true;
+	collection_render.SetCustomStyle(library_style);
 	collection_gallery_.SetItemRender(collection_render);
+	for(SymbolPickerDragGallery* gallery : { &library_gallery_, &collection_gallery_ }) {
+		gallery->ClearCustomStyle();
+		auto style = gallery->GetStyle();
+		style.metrics.radius = DPI(8);
+		style.skin = StyledSkin();
+		gallery->SetCustomStyle(style);
+	}
+	for(UiPanel* panel : { &categories_panel_, &library_panel_, &collections_panel_ })
+		{
+		panel->ClearCustomStyle();
+		panel->SetRadius(DPI(8));
+	}
+
+}
+
+void SymbolPickerWorkspaceView::ApplyThemeState()
+{
+	ConfigureGalleryRenderers();
+	app_title_.SetCustomStyle(HeadingStyle());
+	categories_title_.SetCustomStyle(HeadingStyle());
+	collections_title_.SetCustomStyle(HeadingStyle());
+	project_label_.SetCustomStyle(StatusStyle());
+	library_status_.SetCustomStyle(StatusStyle());
+	collections_status_.SetCustomStyle(StatusStyle());
+	library_zoom_hint_.SetCustomStyle(StatusStyle());
+	image_cache_.Clear();
+	image_style_ = -1;
+	seen_library_revision_ = -1;
+	seen_collections_revision_ = -1;
+	UpdateThemeButton();
+	library_gallery_.RefreshLayout();
+	collection_gallery_.RefreshLayout();
+	root_.RefreshLayout();
+	RefreshFromModel();
+	Refresh();
+}
+
+void SymbolPickerWorkspaceView::Skin()
+{
+	if(ui_ready_) ApplyThemeState();
 }
 
 void SymbolPickerWorkspaceView::WireActions()
 {
+	symbols_view_.WhenAction = [=] { SetLibraryAssetKind(0); };
+	images_view_.WhenAction = [=] { SetLibraryAssetKind(1); };
+	collection_asset_view_.WhenSelectData = [=](const Value&) { RefreshCollectionProjection(false); };
 	theme_button_.WhenAction = [=] {
 		bool dark = UiTheme::GetMode() != UiThemeMode::Dark;
 		UiTheme::Set(dark ? UiThemeMode::Dark : UiThemeMode::Light);
 		Ctrl::SwapDarkLight();
-		image_cache_.Clear();
-		image_style_ = -1;
-		seen_library_revision_ = -1;
-		seen_collections_revision_ = -1;
-		UpdateThemeButton();
-		library_gallery_.RefreshLayout();
-		collection_gallery_.RefreshLayout();
-		root_.RefreshLayout();
-		RefreshFromModel();
-		Refresh();
+		ApplyThemeState();
 	};
-	help_button_.WhenAction = [=] {
-		PromptOK("[*+130 Symbol Picker]&"
-		         "Browse the full model-backed symbol catalogue without a per-icon control cost.&"
-		         "Use search, categories and style to narrow the library; Ctrl/Shift or marquee selects multiple symbols.&"
-		         "Drag selected symbols into the active collection, drag collection items to reorder, and use Ctrl+Z / Ctrl+Y for undo and redo.&"
-		         "Rendered previews are prepared lazily for the visible Gallery range and reused from the image cache.");
+	file_actions_.WhenCatalogChanged = [=] { SetCatalog(catalog_); };
+	import_assets_.WhenAction = [=] { file_actions_.ImportCustomAssets(); };
+	library_gallery_.WhenFilesDropped = [=](const Vector<String>& paths) { file_actions_.ImportCustomFiles(paths); };
+	collection_gallery_.WhenFilesDropped = [=](const Vector<String>& paths) {
+		file_actions_.ImportCustomFiles(paths);
+		if(!catalog_) return;
+		// Save IDs before callbacks can rebuild the catalogue/projection.
+		Vector<String> ids;
+		for(const auto& entry : catalog_->GetIcons())
+			for(const String& path : paths)
+				if(entry.external_file == GetFullPath(path)) ids.Add(entry.catalog_id);
+		library_gallery_.ClearSelection();
+		for(const String& id : ids) AddLibrarySelectionToCollection(id);
 	};
+	help_button_.WhenAction = [=] { ShowSymbolPickerHelp(help_window_); };
+	utilities_button_.WhenAction = [=] { ShowSymbolPickerUtilities(utilities_window_, model_ ? model_->GetProjectFilePath() : String()); };
 	exit_button_.WhenAction = [=] { Close(); };
 
 	categories_filter_.WhenChange = [=] {
@@ -363,7 +453,18 @@ void SymbolPickerWorkspaceView::WireActions()
 	library_filter_.WhenChange = [=] {
 		if(syncing_)
 			return;
-		SetTimeCallback(70, [=] { ApplyLibraryFilter(); }, kLibraryFilterCallbackId);
+		SetTimeCallback(70, [=] { ApplyLibraryFilter(); }, TIMEID_LIBRARY_FILTER);
+	};
+	library_zoom_in_.WhenAction = [=] { library_gallery_.ZoomBy(1.12); };
+	library_zoom_out_.WhenAction = [=] { library_gallery_.ZoomBy(1.0 / 1.12); };
+	library_zoom_.WhenAction = [=] {
+		String text = TrimBoth(library_zoom_.GetTextUtf8());
+		if(text.EndsWith("%")) text.Trim(text.GetCount() - 1);
+		const char* end = nullptr;
+		double percent = ScanDouble(~text, &end);
+		if(!IsNull(percent) && end && *end == 0 && percent > 0)
+			library_gallery_.SetZoom(percent / 100.0);
+		UpdateLibraryStatus();
 	};
 	library_gallery_.WhenSelection = [=] { UpdateLibraryStatus(); };
 	library_gallery_.WhenZoom = [=](double) { UpdateLibraryStatus(); };
@@ -428,12 +529,13 @@ void SymbolPickerWorkspaceView::WireActions()
 	};
 	copy_button_.WhenAction = [=] { file_actions_.CopyCurrentExportToClipboard(); };
 	delete_items_.WhenAction = [=] { RemoveSelectedCollectionItems(); };
+	mark_used_.WhenAction = [=] { ToggleSelectedUsage(); };
 	clear_collection_.WhenAction = [=] { ClearActiveCollection(); };
 	collection_filter_.WhenAction = [=] { RefreshCollectionProjection(); };
 	collection_filter_.WhenChange = [=] {
 		if(syncing_)
 			return;
-		SetTimeCallback(70, [=] { RefreshCollectionProjection(); }, kCollectionFilterCallbackId);
+		SetTimeCallback(70, [=] { RefreshCollectionProjection(); }, TIMEID_COLLECTION_FILTER);
 	};
 	collection_gallery_.WhenSelection = [=] {
 		UpdateCollectionStatus();
@@ -458,17 +560,32 @@ void SymbolPickerWorkspaceView::WireActions()
 			ReorderCollectionItem(result);
 		SetDragActive(false);
 	};
+	library_style_.WhenSelectData = [=](const Value&) { library_style_.WhenAction(); };
+	collections_selector_.WhenSelectData = [=](const Value&) { collections_selector_.WhenAction(); };
+	export_size_.WhenSelectData = [=](const Value&) { export_size_.WhenAction(); };
+	export_type_.WhenSelectData = [=](const Value&) { export_type_.WhenAction(); };
 }
 
+void SymbolPickerWorkspaceView::SetLibraryAssetKind(int kind)
+{
+ library_asset_kind_ = kind;
+ seen_library_revision_ = -1;
+ if(model_) {
+  model_->SetCurrentCategory("All");
+  model_->SetFilterText("");
+ }
+ RefreshFromModel();
+}
 void SymbolPickerWorkspaceView::SetModel(SymbolPickerModel* model)
 {
 	model_ = model;
 	seen_library_revision_ = seen_collections_revision_ = seen_export_revision_ = seen_project_revision_ = -1;
+	seen_active_collection_ = -2;
 	file_actions_.SetContext(model_, catalog_, commands_);
 	RefreshFromModel();
 }
 
-void SymbolPickerWorkspaceView::SetCatalog(const SymbolPickerCatalog* catalog)
+void SymbolPickerWorkspaceView::SetCatalog(SymbolPickerCatalog* catalog)
 {
 	catalog_ = catalog;
 	++catalog_generation_;
@@ -516,8 +633,11 @@ void SymbolPickerWorkspaceView::RefreshFromModel()
 		RefreshLibraryProjection();
 	}
 	if(collections_changed) {
+		bool switched = seen_active_collection_ != model_->GetActiveCollectionIndex();
+		if(switched) { collection_filter_.SetTextUtf8(""); collection_asset_view_.SetDataSilently(-1); }
 		RefreshCollectionSelector();
-		RefreshCollectionProjection();
+		RefreshCollectionProjection(!switched);
+		seen_active_collection_ = model_->GetActiveCollectionIndex();
 	}
 	if(project_changed || collections_changed)
 		SyncProjectUi();
@@ -536,7 +656,8 @@ void SymbolPickerWorkspaceView::RefreshFromModel()
 void SymbolPickerWorkspaceView::SyncLibraryControls()
 {
 	library_style_.SetDataSilently((int)model_->GetIconStyle());
-	library_filter_.SetTextUtf8(model_->GetFilterText());
+	if(library_filter_.GetTextUtf8() != model_->GetFilterText())
+		library_filter_.SetTextUtf8(model_->GetFilterText());
 	library_tint_ <<= model_->GetTintColor();
 }
 
@@ -564,31 +685,54 @@ void SymbolPickerWorkspaceView::RefreshCategoryButtons()
 	category_buttons_.Clear();
 
 	String selected = model_ ? model_->GetCurrentCategory() : String("All");
+	categories_title_.SetText(library_asset_kind_ == 1 ? "Image categories" : "Icon categories");
+	symbols_view_.SetChecked(library_asset_kind_ == 0); images_view_.SetChecked(library_asset_kind_ == 1);
+	library_style_.Enable(library_asset_kind_ == 0);
 	String filter = categories_filter_.GetTextUtf8();
 	Vector<SymbolPickerCategory> categories;
 	int total = 0;
 	if(catalog_) {
 		SymbolPickerIconStyle style = model_ ? model_->GetIconStyle() : SymbolPickerIconStyle::Outlined;
-		categories = catalog_->GetCategories(style);
+		categories = catalog_->GetCategories(style, library_asset_kind_);
 		for(const auto& category : categories)
 			total += category.icon_count;
 	}
 
-	auto AddCategory = [&](const String& id, const String& text) {
+	auto AddCategory = [&](const String& id, const String& text, int palette_index) {
 		UiButton& button = category_buttons_.Add(new UiButton());
+		auto style = UiTheme::ResolveButton();
+		bool dark = UiTheme::GetMode() == UiThemeMode::Dark;
+		Color tint = CategoryTint(palette_index, categories.GetCount() + 1);
+		Color face = dark ? Blend(Color(25, 32, 44), tint, 85) : tint;
+		style.skin = StyledSkin();
+		style.metrics.face_enabled = true;
+		style.metrics.radius = DPI(8);
+		style.palette.face[ST_NORMAL] = UiFill::Solid(face);
+		style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, dark ? White() : Black(), 20));
+		style.palette.face[ST_PRESSED] = UiFill::Solid(dark ? Blend(face, tint, 100) : Blend(tint, Color(65, 100, 150), 55));
+		style.palette.ink[ST_NORMAL] = dark ? White() : Color(35, 45, 60);
+		style.palette.ink[ST_PRESSED] = style.palette.ink[ST_NORMAL];
+		style.palette.frame[ST_PRESSED] = dark ? tint : Blend(tint, Color(45, 75, 115), 140);
+		button.SetCustomStyle(style);
 		button.SetText(text).SetCheckable(true).SetChecked(selected == id).SetContentInset(DPI(4));
 		categories_flow_.Add(button).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
+		Ptr<UiButton> category_button = &button;
 		button.WhenAction = [=] {
-			if(model_ && commands_)
-				commands_->Execute(MakeSymbolPickerSetCategoryCommand(id), *model_);
+			if(category_button) category_button->SetChecked(true);
+			PostCallback([=] {
+				if(model_ && commands_)
+					commands_->Execute(MakeSymbolPickerSetCategoryCommand(id), *model_);
+			});
 		};
 	};
 
-	AddCategory("All", catalog_ ? Format("All (%d)", total) : String("All"));
+	AddCategory("All", catalog_ ? Format("All (%d)", total) : String("All"), 0);
+	int palette_index = 0;
 	for(const auto& category : categories) {
+		++palette_index;
 		String text = Format("%s (%d)", category.display_name, category.icon_count);
 		if(MatchText(text, filter))
-			AddCategory(category.id, text);
+			AddCategory(category.id, text, palette_index);
 	}
 }
 
@@ -605,7 +749,22 @@ void SymbolPickerWorkspaceView::RefreshLibraryProjection(bool preserve_selection
 #ifdef _DEBUG
 	int64 started = msecs();
 #endif
-	library_projection_.Rebuild(*catalog_, model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle());
+	library_projection_.Rebuild(*catalog_, model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle(), library_asset_kind_);
+	String category = model_->GetCurrentCategory();
+	auto categories = catalog_->GetCategories(model_->GetIconStyle(), library_asset_kind_);
+	int palette_index = 0;
+	for(int i = 0; i < categories.GetCount(); ++i)
+		if(categories[i].id == category) {
+			category = categories[i].display_name;
+			palette_index = i + 1;
+			break;
+		}
+	Color tint = CategoryTint(palette_index, categories.GetCount() + 1);
+	auto heading = HeadingStyle();
+	heading.palette.ink[ST_NORMAL] = UiTheme::GetMode() == UiThemeMode::Dark
+		? tint : Blend(tint, Color(30, 40, 55), 175);
+	library_title_.SetCustomStyle(heading).SetText(String(library_asset_kind_ == 1 ? "Images · " : "Library · ") + category + Format(" · %d", library_projection_.GetCount()));
+
 	if(preserve_selection)
 		library_gallery_.SetData(selection);
 	else
@@ -649,7 +808,7 @@ void SymbolPickerWorkspaceView::RefreshCollectionProjection(bool preserve_select
 		return;
 	}
 
-	collection_projection_.Rebuild(*active, *catalog_, collection_filter_.GetTextUtf8());
+	collection_projection_.Rebuild(*active, *catalog_, collection_filter_.GetTextUtf8(), (int)collection_asset_view_.GetData());
 	if(preserve_selection)
 		collection_gallery_.SetData(selection);
 	else
@@ -698,6 +857,7 @@ void SymbolPickerWorkspaceView::PrepareLibraryImages(int first, int last)
 		return;
 
 	preparing_library_images_ = true;
+	int changed_first = -1, changed_last = -1;
 	for(int i = first; i <= last; ++i) {
 		const UiModelItem& current = library_projection_.Model().Get(i);
 		if(!current.image.IsEmpty())
@@ -705,13 +865,18 @@ void SymbolPickerWorkspaceView::PrepareLibraryImages(int first, int last)
 		const SymbolPickerIconEntry* entry = library_projection_.GetEntry(i);
 		if(!entry)
 			continue;
-		Image image = image_cache_.GetImage(*entry, DPI(kPreviewPx), GetLibraryPreviewTint());
+		// Theme contrast applies to built-in UI symbols. Imported artwork keeps
+		// its colours unless the user explicitly chooses a tint.
+		Color tint = entry->external_file.IsEmpty() ? GetLibraryPreviewTint() : model_->GetTintColor();
+		Image image = image_cache_.GetImage(*entry, DPI(kPreviewPx), tint);
 		if(image.IsEmpty())
 			continue;
-		UiModelItem updated = current;
-		updated.image = image;
-		library_projection_.Model().Set(i, updated);
+		library_projection_.Model().Get(i).image = image;
+		if(changed_first < 0) changed_first = i;
+		changed_last = i;
 	}
+	if(changed_first >= 0)
+		library_projection_.Model().Touch(changed_first, changed_last - changed_first + 1);
 	preparing_library_images_ = false;
 }
 
@@ -728,6 +893,7 @@ void SymbolPickerWorkspaceView::PrepareCollectionImages(int first, int last)
 		return;
 
 	preparing_collection_images_ = true;
+	int changed_first = -1, changed_last = -1;
 	for(int i = first; i <= last; ++i) {
 		const UiModelItem& current = collection_projection_.Model().Get(i);
 		if(!current.image.IsEmpty())
@@ -739,22 +905,28 @@ void SymbolPickerWorkspaceView::PrepareCollectionImages(int first, int last)
 		const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(ref.catalog_id);
 		if(!entry)
 			continue;
-		Image image = image_cache_.GetImage(*entry, DPI(kPreviewPx), GetCollectionPreviewTint(ref));
+		Color tint = entry->external_file.IsEmpty() ? GetCollectionPreviewTint(ref) : ref.tint;
+		Image image = image_cache_.GetImage(*entry, DPI(kPreviewPx), tint);
 		if(image.IsEmpty())
 			continue;
-		UiModelItem updated = current;
-		updated.image = image;
-		collection_projection_.Model().Set(i, updated);
+		collection_projection_.Model().Get(i).image = image;
+		if(changed_first < 0) changed_first = i;
+		changed_last = i;
 	}
+	if(changed_first >= 0)
+		collection_projection_.Model().Touch(changed_first, changed_last - changed_first + 1);
 	preparing_collection_images_ = false;
 }
 
 void SymbolPickerWorkspaceView::UpdateLibraryStatus()
 {
-	String text = Format("%d symbols", library_projection_.GetCount());
+	String text;
 	if(library_gallery_.GetSelectionCount())
-		text << Format(" · %d selected", library_gallery_.GetSelectionCount());
-	text << Format(" · zoom %.0f%%", library_gallery_.GetZoom() * 100.0);
+		text << Format("%d selected", library_gallery_.GetSelectionCount());
+	String zoom = Format("%.0f%%", library_gallery_.GetZoom() * 100.0);
+	if(library_zoom_.GetTextUtf8() != zoom) library_zoom_.SetTextUtf8(zoom);
+	library_zoom_in_.Enable(library_gallery_.GetZoom() < library_gallery_.GetMaxZoom());
+	library_zoom_out_.Enable(library_gallery_.GetZoom() > library_gallery_.GetMinZoom());
 #ifdef _DEBUG
 	text << Format(" · renderers %d · cache %d/%d", library_gallery_.GetLiveItemRenderCount(),
 		image_cache_.GetCount(), image_cache_.GetMaxEntries());
@@ -772,6 +944,9 @@ void SymbolPickerWorkspaceView::UpdateCollectionStatus()
 	String text = Format("%s · %d items", active->name, active->items.GetCount());
 	if(collection_projection_.GetCount() != active->items.GetCount())
 		text << Format(" · %d shown", collection_projection_.GetCount());
+	int used = 0;
+	for(const auto& item : active->items) if(item.marked_used) ++used;
+	if(used) text << Format(" · %d marked used", used);
 	if(collection_gallery_.GetSelectionCount())
 		text << Format(" · %d selected", collection_gallery_.GetSelectionCount());
 	collections_status_.SetText(text);
@@ -784,6 +959,16 @@ void SymbolPickerWorkspaceView::UpdateActionState()
 	bool has_items = has_active && !active->items.IsEmpty();
 	remove_collection_.Enable(has_active);
 	delete_items_.Enable(has_active && collection_gallery_.GetSelectionCount() > 0);
+	mark_used_.Enable(has_active && collection_gallery_.GetSelectionCount() > 0);
+	bool all_used = has_active && collection_gallery_.GetSelectionCount() > 0;
+	if(active) for(int i : GetSelectedCollectionItemIndexes()) all_used = all_used && active->items[i].marked_used;
+	mark_used_.SetText(all_used ? "Unmark used" : "Mark used");
+	String usage_tip = "A blue dot marks an icon as used. This is a warning, not an automatic proof of usage.";
+	if(active) for(int i : GetSelectedCollectionItemIndexes()) {
+		if(!active->items[i].usage_note.IsEmpty()) usage_tip << "\n" << active->items[i].alias << ": " << active->items[i].usage_note;
+	}
+	mark_used_.Tip(usage_tip);
+
 	clear_collection_.Enable(has_items);
 	export_button_.Enable(has_items);
 	copy_button_.Enable(has_items);
@@ -791,7 +976,7 @@ void SymbolPickerWorkspaceView::UpdateActionState()
 
 void SymbolPickerWorkspaceView::UpdateThemeButton()
 {
-	theme_button_.SetText(UiTheme::GetMode() == UiThemeMode::Dark ? "Light" : "Dark");
+	theme_button_.SetIcon(UiTheme::GetMode() == UiThemeMode::Dark ? ICON_ACTION_LIGHT_MODE_48() : ICON_ACTION_DARK_MODE_48());
 }
 
 void SymbolPickerWorkspaceView::ApplyLibraryFilter()
@@ -801,14 +986,85 @@ void SymbolPickerWorkspaceView::ApplyLibraryFilter()
 	commands_->Execute(MakeSymbolPickerSetFilterCommand(library_filter_.GetTextUtf8()), *model_);
 }
 
+bool SymbolPickerWorkspaceView::RunSearchSmokeTests(String& error)
+{
+	// Use the actual selection event emitted by UiDropdown.
+	SymbolPickerProject original = model_->ExportProject();
+	SymbolPickerProject choices;
+	for(int c = 0; c < 2; ++c) {
+		auto& collection = choices.collections.Add(); collection.name = c ? "Second app" : "First app";
+		for(int i = 0; i <= c; ++i) { auto& item = collection.items.Add(); item.catalog_id = catalog_->GetIcons()[i + c * 2].catalog_id; item.alias = "TEST_" + AsString(i); }
+	}
+	choices.active_collection_index = 0; model_->LoadProject(choices);
+	collections_selector_.Select(1);
+	if(model_->GetActiveCollectionIndex() != 1 || collection_gallery_.Model().GetCount() != 2 || collection_projection_.GetCatalogId(0) != choices.collections[1].items[0].catalog_id) { error = "Selecting a different collection did not replace its gallery."; return false; }
+	library_style_.SelectByData((int)SymbolPickerIconStyle::Sharp);
+	if(model_->GetIconStyle() != SymbolPickerIconStyle::Sharp) { error = "Selecting a symbol style did not update the library."; return false; }
+	export_size_.SelectByData(64); export_type_.SelectByData((int)SymbolPickerExportType::PngFiles);
+	if(model_->GetExportSize() != 64 || model_->GetExportType() != SymbolPickerExportType::PngFiles) { error = "Export dropdown selection did not update its setting."; return false; }
+	SetLibraryAssetKind(1);
+	if(library_gallery_.Model().GetCount() != catalog_->Filter("All", "", model_->GetIconStyle(), 1).GetCount() || library_style_.IsEnabled()) { error = "The Images view mixed SVG icons or retained the symbol-style selector."; return false; }
+	SetLibraryAssetKind(0); model_->LoadProject(original);
+	for(const char* query : { "camera", "no-symbol-matches-this-query", "" }) {
+		library_filter_.SetTextUtf8(query);
+		library_filter_.SetCursor(library_filter_.GetTextUtf8().GetCount());
+		int64 caret = library_filter_.GetCursor();
+		library_filter_.WhenChange();
+		if(!ExistsTimeCallback(TIMEID_LIBRARY_FILTER)) { error = "Library debounce was not scheduled."; return false; }
+		KillTimeCallback(TIMEID_LIBRARY_FILTER);
+		ApplyLibraryFilter();
+		if(library_filter_.GetCursor() != caret) { error = "Library filter refresh moved the caret."; return false; }
+		if(library_gallery_.Model().GetCount() != catalog_->Filter(model_->GetCurrentCategory(), query, model_->GetIconStyle(), library_asset_kind_).GetCount()) {
+			error = "Library filter count differs from catalogue."; return false;
+		}
+		collection_filter_.SetTextUtf8(query);
+		collection_filter_.WhenChange();
+		if(!ExistsTimeCallback(TIMEID_COLLECTION_FILTER)) { error = "Collection debounce was not scheduled."; return false; }
+		KillTimeCallback(TIMEID_COLLECTION_FILTER);
+		RefreshCollectionProjection();
+	}
+	double original_zoom = library_gallery_.GetZoom();
+	library_zoom_.SetTextUtf8("125%");
+	library_zoom_.WhenAction();
+	if(abs(library_gallery_.GetZoom() - 1.25) > 0.001) { error = "Typed zoom did not apply."; return false; }
+	library_zoom_out_.WhenAction();
+	library_zoom_in_.WhenAction();
+	if(abs(library_gallery_.GetZoom() - 1.25) > 0.001) { error = "Zoom buttons did not round-trip."; return false; }
+	library_zoom_.SetTextUtf8("invalid");
+	library_zoom_.WhenAction();
+	if(library_zoom_.GetTextUtf8() != "125%") { error = "Invalid zoom was not restored."; return false; }
+	library_gallery_.SetZoom(original_zoom);
+	// Exercise the same theme transition as the toolbar, including custom surfaces.
+	for(int transition = 0; transition < 4; ++transition) {
+		theme_button_.WhenAction();
+		const auto surface = UiTheme::ResolvePanel();
+		for(UiPanel* panel : { &categories_panel_, &library_panel_, &collections_panel_ })
+			if(panel->GetStyle().palette.face[ST_NORMAL].color != surface.palette.face[ST_NORMAL].color) {
+				error = "Panel retained a surface from the previous theme."; return false;
+			}
+		for(SymbolPickerDragGallery* gallery : { &library_gallery_, &collection_gallery_ })
+			if(gallery->GetStyle().palette.face[ST_NORMAL].color != surface.palette.face[ST_NORMAL].color) {
+				error = "Gallery retained a surface from the previous theme."; return false;
+			}
+		const auto edit = UiTheme::ResolveEdit();
+		if(library_filter_.GetStyle().palette.face[ST_NORMAL].color != edit.palette.face[ST_NORMAL].color) {
+			error = "Search entry did not follow the current theme."; return false;
+		}
+	}
+	error.Clear();
+	return true;
+}
+
 void SymbolPickerWorkspaceView::CreateCollection()
 {
 	if(!model_ || !commands_)
 		return;
 	int new_index = model_->GetCollections().GetCount();
+	String name = "App icons";
+	if(!PromptCollectionName(name)) return;
 	BeginCommandBatch();
 	commands_->BeginGroup("Create collection");
-	bool created = commands_->Execute(MakeSymbolPickerCreateCollectionCommand(Format("Collection %d", new_index + 1)), *model_);
+	bool created = commands_->Execute(MakeSymbolPickerCreateCollectionCommand(name), *model_);
 	if(created)
 		commands_->Execute(MakeSymbolPickerSetActiveCollectionCommand(new_index), *model_);
 	commands_->EndGroup();
@@ -819,6 +1075,7 @@ void SymbolPickerWorkspaceView::RemoveActiveCollection()
 {
 	if(!model_ || !commands_ || model_->GetActiveCollectionIndex() < 0)
 		return;
+	if(!ConfirmUsedRemoval(*model_->GetActiveCollection(), Vector<int>())) return;
 	collection_gallery_.ClearSelection();
 	BeginCommandBatch();
 	commands_->Execute(MakeSymbolPickerRemoveCollectionCommand(model_->GetActiveCollectionIndex()), *model_);
@@ -829,6 +1086,7 @@ void SymbolPickerWorkspaceView::ClearActiveCollection()
 {
 	if(!model_ || !commands_ || model_->GetActiveCollectionIndex() < 0)
 		return;
+	if(!ConfirmUsedRemoval(*model_->GetActiveCollection(), Vector<int>())) return;
 	collection_gallery_.ClearSelection();
 	BeginCommandBatch();
 	commands_->Execute(MakeSymbolPickerClearCollectionCommand(model_->GetActiveCollectionIndex()), *model_);
@@ -849,6 +1107,32 @@ Vector<int> SymbolPickerWorkspaceView::GetSelectedCollectionItemIndexes() const
 	return out;
 }
 
+bool SymbolPickerWorkspaceView::ConfirmUsedRemoval(const SymbolPickerCollection& collection, const Vector<int>& indexes)
+{
+	int used = 0;
+	if(indexes.IsEmpty()) {
+		for(const auto& item : collection.items) if(item.marked_used) ++used;
+	}
+	else for(int i : indexes) if(collection.items[i].marked_used) ++used;
+	return !used || PromptYesNo(Format("%d icon(s) are marked as used in code. Removing them and re-exporting may break callers. Continue?", used));
+}
+
+void SymbolPickerWorkspaceView::ToggleSelectedUsage()
+{
+	const auto* active = model_ ? model_->GetActiveCollection() : nullptr;
+	if(!active || !commands_) return;
+	auto indexes = GetSelectedCollectionItemIndexes();
+	if(indexes.IsEmpty()) return;
+	bool all_used = true;
+	for(int i : indexes) all_used = all_used && active->items[i].marked_used;
+	BeginCommandBatch();
+	commands_->BeginGroup("Mark icon usage");
+	for(int i : indexes)
+		commands_->Execute(MakeSymbolPickerSetIconUsedCommand(model_->GetActiveCollectionIndex(), i, !all_used), *model_);
+	commands_->EndGroup();
+	EndCommandBatch();
+}
+
 void SymbolPickerWorkspaceView::RemoveSelectedCollectionItems()
 {
 	if(!model_ || !commands_ || model_->GetActiveCollectionIndex() < 0)
@@ -856,6 +1140,7 @@ void SymbolPickerWorkspaceView::RemoveSelectedCollectionItems()
 	Vector<int> indexes = GetSelectedCollectionItemIndexes();
 	if(indexes.IsEmpty())
 		return;
+	if(!ConfirmUsedRemoval(*model_->GetActiveCollection(), indexes)) return;
 	Sort(indexes, StdGreater<int>());
 	collection_gallery_.ClearSelection();
 	BeginCommandBatch();
@@ -892,6 +1177,8 @@ Vector<String> SymbolPickerWorkspaceView::GetSelectedLibraryCatalogIds(const Str
 
 String SymbolPickerWorkspaceView::MakeCollectionAlias(const SymbolPickerIconEntry& entry) const
 {
+	if(entry.image_factory)
+		return entry.source_symbol;
 	return "ICON_" + SafeAliasPart(entry.category) + "_" + SafeAliasPart(entry.display_name) + "_" + SafeAliasPart(IconStyleText(entry.style));
 }
 
@@ -926,7 +1213,7 @@ void SymbolPickerWorkspaceView::AddLibrarySelectionToCollection(const String& pr
 			continue;
 		}
 		const SymbolPickerIconEntry* entry = catalog_->FindByCatalogId(id);
-		if(!entry)
+		if(!entry || !entry->available)
 			continue;
 		SymbolPickerIconRef ref;
 		ref.catalog_id = entry->catalog_id;

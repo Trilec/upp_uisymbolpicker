@@ -13,6 +13,9 @@ static SymbolPickerIconEntry CopyEntry(const SymbolPickerIconEntry& src)
 	out.style = src.style;
 	out.source_symbol = src.source_symbol;
 	out.available = src.available;
+	out.image_factory = src.image_factory;
+	out.external_file = src.external_file;
+	out.project_custom = src.project_custom;
 	return out;
 }
 
@@ -33,12 +36,19 @@ static String CategoryDisplayName(const String& id)
 	return out;
 }
 
+bool SymbolPickerMatchesAssetKind(const SymbolPickerIconEntry& entry, int kind)
+{
+	bool raster = !entry.external_file.IsEmpty() && ToLower(GetFileExt(entry.external_file)) != ".svg";
+	return kind < 0 || (kind == 1 ? raster : !raster);
+}
+
 static Vector<SymbolPickerCategory> BuildCategories(const Vector<SymbolPickerIconEntry>& icons,
-	bool filter_style, SymbolPickerIconStyle style)
+	bool filter_style, SymbolPickerIconStyle style, int kind = -1)
 {
 	VectorMap<String, int> counts;
 	for(const auto& icon : icons) {
-		if(filter_style && icon.style != style)
+		if(!SymbolPickerMatchesAssetKind(icon, kind)) continue;
+		if(filter_style && icon.style != style && icon.external_file.IsEmpty() && !icon.image_factory)
 			continue;
 		counts.GetAdd(icon.category, 0)++;
 	}
@@ -79,6 +89,25 @@ void SymbolPickerCatalog::Add(const SymbolPickerIconEntry& entry)
 		source_index_.Add(entry.source_id, index);
 }
 
+void SymbolPickerCatalog::SetCustomAssets(const Vector<SymbolPickerCustomAsset>& assets)
+{
+	Vector<SymbolPickerIconEntry> retained;
+	for(const auto& entry : icons_) if(!entry.project_custom) retained.Add(CopyEntry(entry));
+	Clear();
+	for(const auto& entry : retained) Add(entry);
+	for(const auto& asset : assets) {
+		SymbolPickerIconEntry entry;
+		entry.catalog_id = entry.source_id = asset.catalog_id;
+		entry.category = ToLower(GetFileExt(asset.file_path)) == ".svg" ? "SVG" : "Images";
+		entry.display_name = asset.display_name;
+		entry.source_symbol = asset.display_name;
+		entry.external_file = asset.file_path;
+		entry.project_custom = true;
+		entry.available = FileExists(asset.file_path);
+		Add(entry);
+	}
+}
+
 const Vector<SymbolPickerIconEntry>& SymbolPickerCatalog::GetIcons() const
 {
 	return icons_;
@@ -89,21 +118,22 @@ Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories() const
 	return BuildCategories(icons_, false, SymbolPickerIconStyle::Outlined);
 }
 
-Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories(SymbolPickerIconStyle style) const
+Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories(SymbolPickerIconStyle style, int kind) const
 {
-	return BuildCategories(icons_, true, style);
+	return BuildCategories(icons_, true, style, kind);
 }
 
 Vector<int> SymbolPickerCatalog::Filter(const String& category,
 	const String& text,
-	SymbolPickerIconStyle style) const
+	SymbolPickerIconStyle style, int kind) const
 {
 	String want_category = TrimBoth(category);
 	String want_text = ToLower(TrimBoth(text));
 	Vector<int> out;
 	for(int i = 0; i < icons_.GetCount(); ++i) {
 		const SymbolPickerIconEntry& icon = icons_[i];
-		if(style != icon.style)
+		if(!SymbolPickerMatchesAssetKind(icon, kind)) continue;
+		if(style != icon.style && icon.external_file.IsEmpty() && !icon.image_factory)
 			continue;
 		if(!want_category.IsEmpty() && want_category != "All" && icon.category != want_category)
 			continue;

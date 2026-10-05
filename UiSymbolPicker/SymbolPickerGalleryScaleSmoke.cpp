@@ -34,8 +34,8 @@ bool RunSymbolPickerGalleryScaleSmokeTests(const SymbolPickerCatalog& catalog, S
 	UiGallery gallery;
 	gallery.SetModel(projection.Model())
 	       .SetSelectionMode(UIGALLERYSEL_MULTI)
-	       .SetItemSize(Size(DPI(92), DPI(92)))
-	       .SetGap(DPI(6))
+	       .SetItemSize(Size(DPI(64), DPI(56)))
+	       .SetGap(DPI(4))
 	       .SetInset(DPI(6))
 	       .SetOverscanRows(2);
 	gallery.SetRect(0, 0, DPI(900), DPI(520));
@@ -74,6 +74,25 @@ bool RunSymbolPickerGalleryScaleSmokeTests(const SymbolPickerCatalog& catalog, S
 	if(gallery.GetSelectionCount() != 1 || projection.GetCatalogId(gallery.GetCursor()) != stable_id)
 		return Fail("Gallery scale smoke did not restore selection by stable catalog identity.");
 
+	// Category counts must describe reachable rows, including libraries larger
+	// than 500. Exercise structural shrink/grow and final-row navigation for
+	// every category and style against the current Gallery implementation.
+	for(SymbolPickerIconStyle style : { SymbolPickerIconStyle::Outlined,
+	                                   SymbolPickerIconStyle::Rounded,
+	                                   SymbolPickerIconStyle::Sharp }) {
+		for(const auto& category : catalog.GetCategories(style)) {
+			projection.Rebuild(catalog, category.id, String(), style);
+			gallery.Layout();
+			if(projection.GetCount() != category.icon_count || gallery.Model().GetCount() != category.icon_count)
+				return Fail("Gallery category count differs from its advertised count.");
+			int final = category.icon_count - 1;
+			gallery.SetCursor(final);
+			if(gallery.GetCursor() != final || !gallery.GetVisibleRange(false).Contains(final))
+				return Fail("Gallery cannot navigate to a category's final symbol.");
+			if(gallery.GetLiveItemRenderCount() > gallery.GetVisibleRange(true).GetCount())
+				return Fail("Gallery category navigation exceeded its visible renderer bound.");
+		}
+	}
 	error.Clear();
 	return true;
 }

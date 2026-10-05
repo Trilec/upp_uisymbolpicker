@@ -14,11 +14,14 @@ namespace Upp {
 class SymbolPickerFileActions {
 public:
 	void SetContext(SymbolPickerModel* model,
-		const SymbolPickerCatalog* catalog,
+		SymbolPickerCatalog* catalog,
 		SymbolPickerCommandStack* commands);
 
 	bool SaveProject(bool save_as = false);
 	bool LoadProject();
+	bool ImportCustomAssets();
+	bool ImportCustomFiles(const Vector<String>& paths);
+	Event<> WhenCatalogChanged;
 	bool CopyCurrentExportToClipboard();
 	bool Export(SymbolPickerExportScope scope);
 
@@ -35,7 +38,7 @@ private:
 	bool ExportPngFiles(SymbolPickerExportScope scope);
 
 	SymbolPickerModel* model_ = nullptr;
-	const SymbolPickerCatalog* catalog_ = nullptr;
+	SymbolPickerCatalog* catalog_ = nullptr;
 	SymbolPickerCommandStack* commands_ = nullptr;
 };
 

@@ -1,5 +1,6 @@
 #include "SymbolPickerImlExport.h"
 #include "SymbolPickerImageRender.h"
+#include "SymbolPickerUiCatalogAdapter.h"
 #include <Utilities/IconExportCore/IconExportCore.h>
 
 namespace Upp {
@@ -137,21 +138,24 @@ static String BuildImlText(const Vector<SymbolPickerImlEmission>& emissions, con
 }
 
 static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& emissions,
-	const String& iml_file_name)
+	const String& iml_file_name, bool shared_ui_catalog)
 {
-	if(emissions.IsEmpty())
+	if(emissions.IsEmpty() || (shared_ui_catalog && ToLower(GetFileName(iml_file_name)) != "uiicons.iml"))
 		return String();
 
 	String base = MakeSymbolPickerSafeCppIdentifierSegment(GetFileTitle(iml_file_name));
 	if(base.IsEmpty() || base == "_")
 		base = "SYMBOLS";
-	String image_class = base + "Img";
+	String image_class = shared_ui_catalog ? String("UiIconsImg") : base + "Img";
 	String implementation_macro = base + "_IML_IMPLEMENTATION";
 	String catalog_type = base + "CatalogEntry";
 	String catalog_fn = "Get" + base + "Catalog";
 	String categories_fn = "Get" + base + "Categories";
 	String guard = "_SYMBOLPICKER_GENERATED_" + base + "_h_";
-	String quoted_iml = "\"" + EscapeImlCppString(GetFileName(iml_file_name)) + "\"";
+	String include_path = GetFileName(iml_file_name);
+	if(!GetFileFolder(iml_file_name).IsEmpty())
+		include_path = GetFileName(GetFileFolder(iml_file_name)) + "/" + include_path;
+	String quoted_iml = shared_ui_catalog ? String("<Ui/UiIcons.iml>") : "\"" + EscapeImlCppString(include_path) + "\"";
 
 	Index<String> categories;
 	for(const SymbolPickerImlEmission& emission : emissions)
@@ -159,7 +163,9 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 
 	String out;
 	out << "#ifndef " << guard << "\n#define " << guard << "\n\n";
-	out << "#include <CtrlCore/CtrlCore.h>\n\nnamespace Upp {\n\n";
+	out << "#include <CtrlCore/CtrlCore.h>\n";
+	if(shared_ui_catalog) out << "#include <Ui/UiDataModels.h>\n";
+	out << "\nnamespace Upp {\n\n";
 	out << "#define IMAGECLASS " << image_class << "\n";
 	out << "#define IMAGEFILE " << quoted_iml << "\n";
 	out << "#include <Draw/iml_header.h>\n\n";
@@ -195,8 +201,9 @@ static String BuildImlLibraryHeaderText(const Vector<SymbolPickerImlEmission>& e
 	out << "\t};\n"
 	       "\tcount = (int)(sizeof(categories) / sizeof(categories[0]));\n"
 	       "\treturn categories;\n"
-	       "}\n\n"
-	       "}\n\n#endif\n";
+	       "}\n\n";
+	if(shared_ui_catalog) out << kSymbolPickerUiCatalogAdapter;
+	out << "}\n\n#endif\n";
 	return out;
 }
 
@@ -207,7 +214,7 @@ String BuildSymbolPickerUppIml(const SymbolPickerProject& project,
 {
 	Vector<String> local;
 	Vector<String>& warn = warnings ? *warnings : local;
-	Vector<SymbolPickerImlEmission> emissions = BuildImlEmissions(project, catalog, scope, warn);
+	Vector<SymbolPickerImlEmission> emissions = BuildImlEmissions(project, catalog, project.shared_ui_catalog ? SymbolPickerExportScope::AllCollections : scope, warn);
 	return BuildImlText(emissions, warn);
 }
 
@@ -219,8 +226,8 @@ String BuildSymbolPickerUppImlLibraryHeader(const SymbolPickerProject& project,
 {
 	Vector<String> local;
 	Vector<String>& warn = warnings ? *warnings : local;
-	Vector<SymbolPickerImlEmission> emissions = BuildImlEmissions(project, catalog, scope, warn);
-	return BuildImlLibraryHeaderText(emissions, iml_file_name);
+	Vector<SymbolPickerImlEmission> emissions = BuildImlEmissions(project, catalog, project.shared_ui_catalog ? SymbolPickerExportScope::AllCollections : scope, warn);
+	return BuildImlLibraryHeaderText(emissions, iml_file_name, project.shared_ui_catalog);
 }
 
 bool BuildSymbolPickerUppImlLibrary(const SymbolPickerProject& project,
@@ -233,9 +240,9 @@ bool BuildSymbolPickerUppImlLibrary(const SymbolPickerProject& project,
 {
 	Vector<String> local;
 	Vector<String>& warn = warnings ? *warnings : local;
-	Vector<SymbolPickerImlEmission> emissions = BuildImlEmissions(project, catalog, scope, warn);
+	Vector<SymbolPickerImlEmission> emissions = BuildImlEmissions(project, catalog, project.shared_ui_catalog ? SymbolPickerExportScope::AllCollections : scope, warn);
 	iml_text = BuildImlText(emissions, warn);
-	header_text = BuildImlLibraryHeaderText(emissions, iml_file_name);
+	header_text = BuildImlLibraryHeaderText(emissions, iml_file_name, project.shared_ui_catalog);
 	return !iml_text.IsEmpty() && !header_text.IsEmpty();
 }
 

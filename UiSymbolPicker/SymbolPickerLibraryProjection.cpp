@@ -12,9 +12,9 @@ void SymbolPickerLibraryProjection::Clear()
 void SymbolPickerLibraryProjection::Rebuild(const SymbolPickerCatalog& catalog,
 	const String& category,
 	const String& text,
-	SymbolPickerIconStyle style)
+	SymbolPickerIconStyle style, int kind)
 {
-	Vector<int> filtered = catalog.Filter(category, text, style);
+	Vector<int> filtered = catalog.Filter(category, text, style, kind);
 	Vector<int> rows;
 	Vector<UiModelItem> items;
 	rows.Reserve(filtered.GetCount());
@@ -26,7 +26,12 @@ void SymbolPickerLibraryProjection::Rebuild(const SymbolPickerCatalog& catalog,
 			continue;
 		const SymbolPickerIconEntry& entry = icons[row];
 		rows.Add(row);
-		items.Add(UiModelItem(entry.display_name, entry.catalog_id));
+		auto& item = items.Add(UiModelItem(entry.display_name, entry.catalog_id));
+		if(!entry.available) {
+			item.text << " (missing)";
+			item.has_metadata = true;
+			item.metadata_color = Color(226, 141, 0);
+		}
 	}
 
 	catalog_ = &catalog;

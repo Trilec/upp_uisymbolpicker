@@ -68,8 +68,23 @@ static Image RenderTransparentSvg(Size sz, const String& svg_xml)
 Image RenderSymbolPickerIconImage(const SymbolPickerIconEntry& entry, int pixel_size, Color tint, String* error)
 {
 	int size = max(1, pixel_size);
+	bool external_svg = !entry.external_file.IsEmpty() && ToLower(GetFileExt(entry.external_file)) == ".svg";
+	if(entry.image_factory || (!entry.external_file.IsEmpty() && !external_svg)) {
+		Image original = entry.image_factory ? entry.image_factory() : StreamRaster::LoadFileAny(entry.external_file);
+		if(original.IsEmpty()) { if(error) *error = "Ui icon factory returned an empty image."; return Null; }
+		Size fitted = GetFitSize(original.GetSize(), Size(size, size));
+		Image scaled = Rescale(original, fitted);
+		ImageBuffer canvas(size, size);
+		Fill(~canvas, RGBAZero(), canvas.GetLength());
+		Point offset((size - fitted.cx) / 2, (size - fitted.cy) / 2);
+		for(int y = 0; y < fitted.cy; ++y)
+			Copy(canvas[y + offset.y] + offset.x, scaled[y], fitted.cx);
+		return TintRenderedImage(Image(canvas), tint);
+	}
 	String svg_xml;
-	if(!DecodeGeneratedSymbolPickerSvg(entry.catalog_id, svg_xml) || svg_xml.IsEmpty()) {
+	if(external_svg) svg_xml = LoadFile(entry.external_file);
+	else DecodeGeneratedSymbolPickerSvg(entry.catalog_id, svg_xml);
+	if(svg_xml.IsVoid() || svg_xml.IsEmpty()) {
 		if(error)
 			*error = Format("Could not decode SVG for %s.", entry.catalog_id);
 		return Null;

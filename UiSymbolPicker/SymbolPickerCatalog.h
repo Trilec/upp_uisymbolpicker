@@ -13,6 +13,9 @@ struct SymbolPickerIconEntry : Moveable<SymbolPickerIconEntry> {
 	SymbolPickerIconStyle style = SymbolPickerIconStyle::Outlined;
 	String                source_symbol;
 	bool                  available = true;
+	UiIconFactoryFn       image_factory = nullptr;
+	String                external_file;
+	bool                  project_custom = false;
 };
 
 struct SymbolPickerCategory : Moveable<SymbolPickerCategory> {
@@ -21,18 +24,22 @@ struct SymbolPickerCategory : Moveable<SymbolPickerCategory> {
 	int    icon_count = 0;
 };
 
+// -1: all assets; 0: icon/SVG sources (including shared Ui factories); 1: raster files.
+bool SymbolPickerMatchesAssetKind(const SymbolPickerIconEntry& entry, int kind);
+
 class SymbolPickerCatalog {
 public:
 	void Clear();
 	void Add(const SymbolPickerIconEntry& entry);
+	void SetCustomAssets(const Vector<SymbolPickerCustomAsset>& assets);
 
 	const Vector<SymbolPickerIconEntry>& GetIcons() const;
 	Vector<SymbolPickerCategory> GetCategories() const;
-	Vector<SymbolPickerCategory> GetCategories(SymbolPickerIconStyle style) const;
+	Vector<SymbolPickerCategory> GetCategories(SymbolPickerIconStyle style, int kind = -1) const;
 
 	Vector<int> Filter(const String& category,
 		const String& text,
-		SymbolPickerIconStyle style) const;
+		SymbolPickerIconStyle style, int kind = -1) const;
 
 	const SymbolPickerIconEntry* FindByCatalogId(const String& catalog_id) const;
 	const SymbolPickerIconEntry* FindBySourceId(const String& source_id) const;

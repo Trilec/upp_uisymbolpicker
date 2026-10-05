@@ -11,7 +11,7 @@ namespace Upp {
 
 class SymbolPickerApp {
 public:
-	bool Init(String& error);
+	bool Init(String& error, bool run_tests = false);
 	void Run();
 	bool IsSeedFallbackUsed() const { return used_seed_fallback_; }
 

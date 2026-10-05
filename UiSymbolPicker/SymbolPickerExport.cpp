@@ -675,7 +675,10 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 			ex.unresolved = false;
 
 			String svg_xml;
-			if(!DecodeGeneratedSymbolPickerSvg(ex.catalog_id, svg_xml) || svg_xml.IsEmpty()) {
+			if(!entry->external_file.IsEmpty() && ToLower(GetFileExt(entry->external_file)) == ".svg")
+				svg_xml = LoadFile(entry->external_file);
+			else DecodeGeneratedSymbolPickerSvg(ex.catalog_id, svg_xml);
+			if(svg_xml.IsVoid() || svg_xml.IsEmpty()) {
 				warn.Add(Format("Could not decode SVG for %s.", ex.catalog_id));
 				++skipped;
 				ok = false;

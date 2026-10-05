@@ -54,6 +54,8 @@ One<SymbolPickerCommand> MakeSymbolPickerMoveCollectionIconCommand(int collectio
 One<SymbolPickerCommand> MakeSymbolPickerClearCollectionCommand(int collection_index);
 One<SymbolPickerCommand> MakeSymbolPickerRenameCollectionIconAliasCommand(int collection_index, int item_index, const String& alias);
 
+One<SymbolPickerCommand> MakeSymbolPickerSetIconUsedCommand(int collection_index, int item_index, bool used);
+
 bool RunSymbolPickerCommandSmokeTests(String& error);
 
 }

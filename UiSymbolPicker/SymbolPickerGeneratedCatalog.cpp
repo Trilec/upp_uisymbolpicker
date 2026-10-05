@@ -1,34 +1,7 @@
 #include "SymbolPickerGeneratedCatalog.h"
 #include "SymbolPickerCatalogSeed.h"
+#include "Generated/CatalogTables.h"
 
-#include "Generated/icons_action.h"
-#include "Generated/icons_activitie.h"
-#include "Generated/icons_alert.h"
-#include "Generated/icons_android.h"
-#include "Generated/icons_audio_video.h"
-#include "Generated/icons_busines.h"
-#include "Generated/icons_communicate.h"
-#include "Generated/icons_communication.h"
-#include "Generated/icons_content.h"
-#include "Generated/icons_device.h"
-#include "Generated/icons_editor.h"
-#include "Generated/icons_file.h"
-#include "Generated/icons_hardware.h"
-#include "Generated/icons_home.h"
-#include "Generated/icons_household.h"
-#include "Generated/icons_image.h"
-#include "Generated/icons_map.h"
-#include "Generated/icons_navigation.h"
-#include "Generated/icons_notification.h"
-#include "Generated/icons_place.h"
-#include "Generated/icons_privacy.h"
-#include "Generated/icons_search.h"
-#include "Generated/icons_social.h"
-#include "Generated/icons_text.h"
-#include "Generated/icons_toggle.h"
-#include "Generated/icons_transit.h"
-#include "Generated/icons_travel.h"
-#include "Generated/icons_ui_action.h"
 
 namespace Upp {
 
@@ -121,36 +94,6 @@ struct GeneratedPayloadRow : Moveable<GeneratedPayloadRow> {
 	const char* b64z = nullptr;
 };
 
-#define SYMBOLPICKER_GENERATED_ICON_TABLES(OP) \
-	OP(action) \
-	OP(activitie) \
-	OP(alert) \
-	OP(android) \
-	OP(audio_video) \
-	OP(busines) \
-	OP(communicate) \
-	OP(communication) \
-	OP(content) \
-	OP(device) \
-	OP(editor) \
-	OP(file) \
-	OP(hardware) \
-	OP(home) \
-	OP(household) \
-	OP(image) \
-	OP(map) \
-	OP(navigation) \
-	OP(notification) \
-	OP(place) \
-	OP(privacy) \
-	OP(search) \
-	OP(social) \
-	OP(text) \
-	OP(toggle) \
-	OP(transit) \
-	OP(travel) \
-	OP(ui_action)
-
 static Vector<GeneratedPayloadRow>& GeneratedRowsStorage()
 {
 	static Vector<GeneratedPayloadRow> rows;
@@ -190,6 +133,20 @@ static void EnsureGeneratedLookup()
 #define INDEX_TABLE(ns) AppendGeneratedIndexRows(ns::kIcons, ns::kIconCount);
 	SYMBOLPICKER_GENERATED_ICON_TABLES(INDEX_TABLE);
 #undef INDEX_TABLE
+}
+
+void GetSymbolPickerSourceRows(Vector<SymbolPickerSourceRow>& output)
+{
+	EnsureGeneratedLookup();
+	output.Clear();
+	for(const auto& row : GeneratedRowsStorage()) {
+		auto& item = output.Add();
+		item.category = row.category;
+		item.name = row.name;
+		item.source = row.source;
+		item.style = (int)row.style;
+		item.packed_svg = row.b64z;
+	}
 }
 
 int LoadGeneratedSymbolPickerCatalog(SymbolPickerCatalog& catalog)

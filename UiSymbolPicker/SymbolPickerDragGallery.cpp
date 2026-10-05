@@ -2,6 +2,14 @@
 
 namespace Upp {
 
+void SymbolPickerDragGallery::DragAndDrop(Point, PasteClip& clip)
+{
+	if(AcceptFiles(clip)) {
+		Vector<String> paths = GetFiles(clip);
+		WhenFilesDropped(paths);
+	}
+}
+
 int SymbolPickerDragGallery::HitTestVisibleItem(Point p) const
 {
 	UiVisibleRange range = GetVisibleRange(false);

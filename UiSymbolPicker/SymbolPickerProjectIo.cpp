@@ -70,6 +70,8 @@ static ValueMap IconRefToJson(const SymbolPickerIconRef& ref)
 	if(!ref.category_override.IsEmpty())
 		m.Set("category_override", ref.category_override);
 	m.Set("unresolved", ref.unresolved);
+	m.Set("marked_used", ref.marked_used);
+	m.Set("usage_note", ref.usage_note);
 	return m;
 }
 
@@ -87,6 +89,8 @@ static SymbolPickerIconRef IconRefFromJson(const ValueMap& m)
 	ref.has_style_override = !TrimBoth(style).IsEmpty();
 	ref.style_override = ref.has_style_override ? IconStyleFromString(style) : SymbolPickerIconStyle::Outlined;
 	ref.unresolved = (bool)JsonGet(m, "unresolved", false);
+	ref.marked_used = (bool)JsonGet(m, "marked_used", false);
+	ref.usage_note = AsString(JsonGet(m, "usage_note"));
 	return ref;
 }
 
@@ -141,6 +145,19 @@ bool SaveSymbolPickerProjectJson(const SymbolPickerProject& project, const Strin
 	root.Set("comment", project.comment);
 	root.Set("output_base_name", project.output_base_name);
 	root.Set("symbol_prefix", project.symbol_prefix);
+	root.Set("shared_ui_catalog", project.shared_ui_catalog);
+	root.Set("export_type", (int)project.default_export_type);
+	ValueArray custom_assets;
+	String folder = UnixPath(GetFileDirectory(GetFullPath(target)));
+	for(const auto& asset : project.custom_assets) {
+		ValueMap a;
+		a.Set("catalog_id", asset.catalog_id);
+		a.Set("display_name", asset.display_name);
+		String file = UnixPath(GetFullPath(asset.file_path));
+		a.Set("file_path", ToLower(file).StartsWith(ToLower(folder)) ? file.Mid(folder.GetCount()) : file);
+		custom_assets.Add(a);
+	}
+	root.Set("custom_assets", custom_assets);
 	root.Set("default_size", max(1, project.default_size));
 	root.Set("default_tint", ColorToHex(project.default_tint));
 	root.Set("default_style", IconStyleToString(project.default_style));
@@ -194,6 +211,22 @@ bool LoadSymbolPickerProjectJson(const String& path, SymbolPickerProject& out, S
 	project.file_path = path;
 	project.output_base_name = AsString(JsonGet(root, "output_base_name", "symbols"));
 	project.symbol_prefix = AsString(JsonGet(root, "symbol_prefix", "ICON_"));
+	project.shared_ui_catalog = (bool)JsonGet(root, "shared_ui_catalog", false);
+	int export_type = (int)JsonGet(root, "export_type", 0);
+	project.default_export_type = export_type >= 0 && export_type <= (int)SymbolPickerExportType::UppImlLibrary ? (SymbolPickerExportType)export_type : SymbolPickerExportType::ImageCall;
+	Value assets_v = JsonGet(root, "custom_assets");
+	if(IsValueArray(assets_v)) {
+		ValueArray assets = assets_v;
+		for(int i = 0; i < assets.GetCount(); ++i) {
+			if(!IsValueMap(assets[i])) continue;
+			ValueMap a = assets[i];
+			auto& asset = project.custom_assets.Add();
+			asset.catalog_id = AsString(JsonGet(a, "catalog_id"));
+			asset.display_name = AsString(JsonGet(a, "display_name"));
+			String file = AsString(JsonGet(a, "file_path"));
+			asset.file_path = GetFullPath(IsFullPath(file) ? file : AppendFileName(GetFileFolder(GetFullPath(path)), file));
+		}
+	}
 	project.default_size = max(1, (int)JsonGet(root, "default_size", 48));
 	project.default_tint = ColorFromHex(AsString(JsonGet(root, "default_tint")));
 	project.default_style = IconStyleFromString(AsString(JsonGet(root, "default_style", "outlined")));
@@ -231,6 +264,7 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	project.output_base_name = "smoke_symbols";
 	project.symbol_prefix = "SMOKE_";
 	project.default_size = 32;
+	project.shared_ui_catalog = true;
 	project.default_tint = Color(16, 32, 48);
 	project.default_style = SymbolPickerIconStyle::Rounded;
 	project.active_collection_index = 1;
@@ -245,6 +279,8 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	first_a.size = 32;
 	first_a.tint = Color(80, 90, 100);
 	first_a.comment = "primary icon";
+	first_a.marked_used = true;
+	first_a.usage_note = "Ui/UiButton.cpp";
 	first_a.category_override = "action";
 	first_a.style_override = SymbolPickerIconStyle::Rounded;
 	first_a.has_style_override = true;
@@ -286,7 +322,7 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	second.items.Add(second_b);
 	project.collections.Add(pick(second));
 
-	String path = AppendFileName(GetTempPath(), "symbolpicker_project_smoke.uppicons.json");
+	String path = AppendFileName(GetTempPath(), "symbolpicker_project_smoke.symbolpicker");
 	String save_error;
 	if(!SaveSymbolPickerProjectJson(project, path, save_error)) {
 		error = "Project save smoke failed: " + save_error;
@@ -303,6 +339,7 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 	if(loaded.project_name != project.project_name
 		|| loaded.comment != project.comment
 		|| loaded.output_base_name != project.output_base_name
+		|| loaded.shared_ui_catalog != project.shared_ui_catalog
 		|| loaded.symbol_prefix != project.symbol_prefix
 		|| loaded.default_size != project.default_size
 		|| loaded.default_tint != project.default_tint
@@ -335,7 +372,9 @@ bool RunSymbolPickerProjectIoSmokeTests(const SymbolPickerCatalog& catalog, Stri
 		error = "Loaded project aliases or identities are wrong.";
 		return false;
 	}
-	if(loaded.collections[0].items[0].comment != "primary icon"
+	if(!loaded.collections[0].items[0].marked_used
+		|| loaded.collections[0].items[0].usage_note != "Ui/UiButton.cpp"
+		|| loaded.collections[0].items[0].comment != "primary icon"
 		|| loaded.collections[0].items[1].comment != "menu icon"
 		|| loaded.collections[1].items[0].comment != "missing icon"
 		|| loaded.collections[1].items[1].comment != "copy icon"

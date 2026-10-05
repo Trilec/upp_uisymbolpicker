@@ -23,6 +23,8 @@ static SymbolPickerIconRef CopyIconRefModel(const SymbolPickerIconRef& src)
 	out.style_override = src.style_override;
 	out.has_style_override = src.has_style_override;
 	out.unresolved = src.unresolved;
+	out.marked_used = src.marked_used;
+	out.usage_note = src.usage_note;
 	return out;
 }
 
@@ -219,6 +221,17 @@ bool SymbolPickerModel::AddIconToCollection(int collection_index, const SymbolPi
 	return true;
 }
 
+bool SymbolPickerModel::SetCollectionIconUsed(int collection_index, int item_index, bool used)
+{
+	if(!IsValidItemIndex(collection_index, item_index)) return false;
+	auto& item = collections_[collection_index].items[item_index];
+	if(item.marked_used == used) return false;
+	item.marked_used = used;
+	collections_[collection_index].dirty = true;
+	Changed(CHANGE_COLLECTIONS);
+	return true;
+}
+
 bool SymbolPickerModel::RemoveIconFromCollection(int collection_index, int item_index)
 {
 	if(!IsValidItemIndex(collection_index, item_index))
@@ -335,6 +348,16 @@ void SymbolPickerModel::MarkCollectionsSaved()
 		Changed(CHANGE_COLLECTIONS);
 }
 
+bool SymbolPickerModel::AddCustomAsset(const SymbolPickerCustomAsset& asset)
+{
+	for(const auto& existing : custom_assets_)
+		if(existing.catalog_id == asset.catalog_id || existing.file_path == asset.file_path) return false;
+	auto& copy = custom_assets_.Add();
+	copy.catalog_id = asset.catalog_id; copy.file_path = asset.file_path; copy.display_name = asset.display_name;
+	Changed(CHANGE_PROJECT);
+	return true;
+}
+
 SymbolPickerProject SymbolPickerModel::ExportProject() const
 {
 	SymbolPickerProject project;
@@ -343,6 +366,12 @@ SymbolPickerProject SymbolPickerModel::ExportProject() const
 	project.file_path = project_file_path_;
 	project.output_base_name = output_base_name_;
 	project.symbol_prefix = symbol_prefix_;
+	project.shared_ui_catalog = shared_ui_catalog_;
+	project.default_export_type = export_type_;
+	for(const auto& asset : custom_assets_) {
+		auto& copy = project.custom_assets.Add();
+		copy.catalog_id = asset.catalog_id; copy.file_path = asset.file_path; copy.display_name = asset.display_name;
+	}
 	project.default_size = export_size_;
 	project.default_tint = tint_color_;
 	project.default_style = icon_style_;
@@ -362,6 +391,13 @@ bool SymbolPickerModel::LoadProject(const SymbolPickerProject& project)
 	output_base_name_ = TrimBoth(project.output_base_name);
 	if(output_base_name_.IsEmpty())
 		output_base_name_ = "symbols";
+	shared_ui_catalog_ = project.shared_ui_catalog;
+	export_type_ = project.default_export_type;
+	custom_assets_.Clear();
+	for(const auto& asset : project.custom_assets) {
+		auto& copy = custom_assets_.Add();
+		copy.catalog_id = asset.catalog_id; copy.file_path = asset.file_path; copy.display_name = asset.display_name;
+	}
 	symbol_prefix_ = TrimBoth(project.symbol_prefix);
 	if(symbol_prefix_.IsEmpty())
 		symbol_prefix_ = "ICON_";
