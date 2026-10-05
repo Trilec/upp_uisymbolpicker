@@ -938,18 +938,25 @@ void SymbolPickerWorkspaceView::UpdateCollectionStatus()
 {
 	const SymbolPickerCollection* active = model_ ? model_->GetActiveCollection() : nullptr;
 	if(!active) {
-		collections_status_.SetText("No active collection");
+		collections_status_.ClearSpans().SetText("No active collection");
 		return;
 	}
-	String text = Format("%s · %d items", active->name, active->items.GetCount());
+	String text = Format("%d items", active->items.GetCount());
 	if(collection_projection_.GetCount() != active->items.GetCount())
 		text << Format(" · %d shown", collection_projection_.GetCount());
 	int used = 0;
 	for(const auto& item : active->items) if(item.marked_used) ++used;
-	if(used) text << Format(" · %d marked used", used);
+	collections_status_.ClearSpans().AddTextSpan(text);
+	if(used) {
+		ImageBuffer marker(DPI(6), DPI(6));
+		Fill(~marker, Color(59, 130, 246), marker.GetLength());
+		collections_status_.AddTextSpan("    ").AddIconSpan(Image(marker))
+			.AddTextSpan(Format(" %d marked in use", used));
+	}
+	text.Clear();
 	if(collection_gallery_.GetSelectionCount())
 		text << Format(" · %d selected", collection_gallery_.GetSelectionCount());
-	collections_status_.SetText(text);
+	if(!text.IsEmpty()) collections_status_.AddTextSpan(text);
 }
 
 void SymbolPickerWorkspaceView::UpdateActionState()

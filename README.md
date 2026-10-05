@@ -2,6 +2,8 @@
 
 A U++ desktop tool for finding, trying and maintaining icons for your applications.
 
+![Symbol Picker in dark theme, showing the symbol library and a shared Ui icons collection](docs/snapshot.jpg)
+
 - Browse 4,150 Material Symbols in outlined, rounded and sharp styles.
 - Filter by category or name and zoom with the buttons or Ctrl+wheel.
 - Build application collections, including your own SVGs and images.
@@ -19,8 +21,9 @@ Launch `bin/windows-x64/UiSymbolPicker.exe` from a release bundle, or build from
 Choose **Icons / SVG** or **Images / PNG**, select a category, and add items to a
 collection. Each collection can represent an application's asset set.
 
-Try `examples/UiIconsBase.symbolpicker` for the 71-icon base set or
-`examples/UiIcons.symbolpicker` for the compatible 162-icon shared Ui set.
+Try [UiIconsBase.symbolpicker](examples/UiIconsBase.symbolpicker) for the 71-icon
+base set or [UiIcons.symbolpicker](examples/UiIcons.symbolpicker) for the compatible
+162-icon shared Ui set.
 Projects store references rather than embedded artwork. Keep custom source files
 available for future editing and exports; exported application assets are independent.
 
