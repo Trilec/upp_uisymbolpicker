@@ -11,9 +11,10 @@ styles. Category memberships can overlap, so category totals exceed the unique
 name count. The pinned source commit and file hashes are retained in
 `UiSymbolPicker/Generated/provenance.json`.
 
-The source design is the regular, unfilled 24 px SVG. Filled variants and other
-optical sizes are separate designs. SVG exports can be rendered at larger pixel
-sizes without enlarging an existing bitmap.
+New library selections offer the regular 20 and 48 optical SVG designs, both filled
+and unfilled, in all three styles. The original unfilled 24 optical artwork remains
+embedded for older project references. Optical design is independent of export
+pixel size: for example, 20 optical artwork can be exported at 64×64 pixels.
 
 ## Native utility workflow
 
@@ -27,15 +28,18 @@ explains each field and action.
    existing third-party checkout. Git on PATH is required for download only.
 2. Download also fetches category metadata from Google Fonts over Windows HTTPS.
    An existing metadata JSON can be selected instead. Metadata is optional for
-   comparison and required for preparing new category entries.
+   comparison and required for preparing new category entries. Downloads include the 20/48 optical and filled designs,
+   plus the 24 optical files required for compatibility.
 3. **Compare** checks baseline names, all three styles, canonical SVG artwork,
    unreadable files, retired entries and live-metadata discrepancies against
    the catalogue compiled into this executable. The full JSON report records
    evidence; an existing folder is not proof of a current upstream download.
 4. **Prepare refresh** writes C++ headers into a separate working folder.
+   Google search tags are compiled into `SearchTags.h` for offline searching.
    Existing category/name/style IDs survive, retired SVG payloads are retained,
    and new names use live categories or Uncategorized. Incomplete styles or
-   unreadable files block staging. The receipt hashes every prepared file.
+   unreadable files block staging. `RenderVariants.h` embeds the optical/fill artwork;
+   incomplete render sets block its generation. The receipt hashes every prepared file.
 5. Review the report, then **Install prepared refresh**. It validates the receipt,
    backs up the current generated files and package, copies the prepared files,
    and registers new category headers in the `.upp` file. Failures restore the
@@ -69,7 +73,7 @@ retain stable source IDs through refreshes.
 The native update tool enumerates symbol directories and reads the selected baseline SVGs,
 validates them and compares XML. It writes compressed Base64 SVG payloads and
 SHA-256 provenance. This work happens during maintenance.
-The main library does not scan 12,450 loose SVG files each time it opens.
+The main library does not scan the downloaded SVG files each time it opens.
 
 At runtime, compiled metadata builds an indexed catalogue. SVG decoding and
 image rendering happen only when needed. Previews share a bounded image cache;

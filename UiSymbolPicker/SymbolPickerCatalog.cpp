@@ -10,7 +10,10 @@ static SymbolPickerIconEntry CopyEntry(const SymbolPickerIconEntry& src)
 	out.source_id = src.source_id;
 	out.category = src.category;
 	out.display_name = src.display_name;
+	out.search_tags = src.search_tags;
 	out.style = src.style;
+	out.optical_size = src.optical_size;
+	out.filled = src.filled;
 	out.source_symbol = src.source_symbol;
 	out.available = src.available;
 	out.image_factory = src.image_factory;
@@ -43,11 +46,12 @@ bool SymbolPickerMatchesAssetKind(const SymbolPickerIconEntry& entry, int kind)
 }
 
 static Vector<SymbolPickerCategory> BuildCategories(const Vector<SymbolPickerIconEntry>& icons,
-	bool filter_style, SymbolPickerIconStyle style, int kind = -1)
+	bool filter_style, SymbolPickerIconStyle style, int kind = -1, int optical_size = 24, bool filled = false)
 {
 	VectorMap<String, int> counts;
 	for(const auto& icon : icons) {
 		if(!SymbolPickerMatchesAssetKind(icon, kind)) continue;
+		if(icon.external_file.IsEmpty() && !icon.image_factory && (icon.optical_size != optical_size || icon.filled != filled)) continue;
 		if(filter_style && icon.style != style && icon.external_file.IsEmpty() && !icon.image_factory)
 			continue;
 		counts.GetAdd(icon.category, 0)++;
@@ -118,14 +122,14 @@ Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories() const
 	return BuildCategories(icons_, false, SymbolPickerIconStyle::Outlined);
 }
 
-Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories(SymbolPickerIconStyle style, int kind) const
+Vector<SymbolPickerCategory> SymbolPickerCatalog::GetCategories(SymbolPickerIconStyle style, int kind, int optical_size, bool filled) const
 {
-	return BuildCategories(icons_, true, style, kind);
+	return BuildCategories(icons_, true, style, kind, optical_size, filled);
 }
 
 Vector<int> SymbolPickerCatalog::Filter(const String& category,
 	const String& text,
-	SymbolPickerIconStyle style, int kind) const
+	SymbolPickerIconStyle style, int kind, bool include_metadata, int optical_size, bool filled) const
 {
 	String want_category = TrimBoth(category);
 	String want_text = ToLower(TrimBoth(text));
@@ -133,12 +137,13 @@ Vector<int> SymbolPickerCatalog::Filter(const String& category,
 	for(int i = 0; i < icons_.GetCount(); ++i) {
 		const SymbolPickerIconEntry& icon = icons_[i];
 		if(!SymbolPickerMatchesAssetKind(icon, kind)) continue;
+		if(icon.external_file.IsEmpty() && !icon.image_factory && (icon.optical_size != optical_size || icon.filled != filled)) continue;
 		if(style != icon.style && icon.external_file.IsEmpty() && !icon.image_factory)
 			continue;
 		if(!want_category.IsEmpty() && want_category != "All" && icon.category != want_category)
 			continue;
 		if(!want_text.IsEmpty()) {
-			String hay = ToLower(icon.display_name + " " + icon.source_id + " " + icon.catalog_id + " " + icon.category);
+			String hay = ToLower(icon.display_name + " " + icon.source_id + " " + icon.catalog_id + " " + icon.category + (include_metadata ? " " + icon.search_tags : String()));
 			if(hay.Find(want_text) < 0)
 				continue;
 		}

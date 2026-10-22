@@ -471,7 +471,7 @@ Vector<SymbolPickerExportItem> BuildSymbolPickerExportItems(const SymbolPickerPr
 		for(int ii = 0; ii < collection.items.GetCount(); ++ii) {
 			const SymbolPickerIconRef& item = collection.items[ii];
 			const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(item.catalog_id);
-			if(!entry && !item.source_id.IsEmpty())
+			if(!entry && !item.source_id.IsEmpty() && !item.catalog_id.EndsWith("/filled") && !item.catalog_id.EndsWith("/unfilled"))
 				entry = catalog.FindBySourceId(item.source_id);
 			if(!entry || item.unresolved) {
 				if(warnings) {
@@ -649,7 +649,7 @@ bool ExportSymbolPickerSvgFiles(const SymbolPickerProject& project,
 		Index<String> used_names;
 		for(const auto& item : collection.items) {
 			const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(item.catalog_id);
-			if(!entry && !item.source_id.IsEmpty())
+			if(!entry && !item.source_id.IsEmpty() && !item.catalog_id.EndsWith("/filled") && !item.catalog_id.EndsWith("/unfilled"))
 				entry = catalog.FindBySourceId(item.source_id);
 			if(!entry || item.unresolved) {
 				warn.Add(Format("Skipped unresolved icon %s%s%s in collection '%s'.",
@@ -759,7 +759,7 @@ bool ExportSymbolPickerPngFiles(const SymbolPickerProject& project,
 		Index<String> used_names;
 		for(const auto& item : collection.items) {
 			const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(item.catalog_id);
-			if(!entry && !item.source_id.IsEmpty())
+			if(!entry && !item.source_id.IsEmpty() && !item.catalog_id.EndsWith("/filled") && !item.catalog_id.EndsWith("/unfilled"))
 				entry = catalog.FindBySourceId(item.source_id);
 			if(!entry || item.unresolved) {
 				warn.Add(Format("Skipped unresolved icon %s%s%s in collection '%s'.",

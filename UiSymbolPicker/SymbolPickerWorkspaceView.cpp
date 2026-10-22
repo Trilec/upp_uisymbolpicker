@@ -26,7 +26,8 @@ UiLabel::Style StatusStyle()
 
 Color CategoryTint(int index, int count)
 {
-	return Blend(Color(255, 218, 183), Color(183, 219, 250),
+	const auto t = UiTheme::GetOliveTokens(UiTheme::GetMode());
+	return Blend(Blend(t.panel, t.accent, 66), Blend(t.panel, t.muted, 24),
 	             count > 1 ? 255 * index / (count - 1) : 0);
 }
 
@@ -99,8 +100,9 @@ void SymbolPickerWorkspaceDragPreview::Paint(Draw& w)
 	Rect r = GetSize();
 	if(r.IsEmpty())
 		return;
-	Color frame = Color(59, 130, 246);
-	w.DrawRect(r, SColorPaper());
+	const auto t = UiTheme::GetOliveTokens(UiTheme::GetMode());
+	Color frame = t.accent;
+	w.DrawRect(r, t.panel);
 	w.DrawRect(r.left, r.top, r.GetWidth(), 1, frame);
 	w.DrawRect(r.left, r.bottom - 1, r.GetWidth(), 1, frame);
 	w.DrawRect(r.left, r.top, 1, r.GetHeight(), frame);
@@ -108,7 +110,7 @@ void SymbolPickerWorkspaceDragPreview::Paint(Draw& w)
 	if(!image_.IsEmpty())
 		w.DrawImage(DPI(8), DPI(8), DPI(32), DPI(32), image_);
 	if(count_ > 1)
-		w.DrawText(DPI(46), DPI(17), Format("%d items", count_), SansSerifZ(9).Bold(), SColorText());
+		w.DrawText(DPI(46), DPI(17), Format("%d items", count_), SansSerifZ(9).Bold(), t.text);
 }
 
 Size SymbolPickerWorkspaceDragPreview::GetMinSize() const
@@ -142,8 +144,11 @@ void SymbolPickerWorkspaceView::BuildUi()
 
 	root_.Add(header_).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
 	root_.Add(categories_panel_).Fixed(DPI(142)).MinMain(DPI(120)).AlignSelf(UiBoxLayout::Align::Stretch);
-	root_.Add(library_panel_).Expand(3).MinMain(DPI(230)).AlignSelf(UiBoxLayout::Align::Stretch);
-	root_.Add(collections_panel_).Expand(2).MinMain(DPI(230)).AlignSelf(UiBoxLayout::Align::Stretch);
+	library_collection_split_.Vert(library_panel_, collections_panel_)
+		.SetSplitPercent(60).SetMinPixels(0, DPI(170)).SetMinPixels(1, DPI(170))
+		.SetGripVisual(UISPLITTER_GRIP_DOTS);
+	library_collection_split_.Tip("Drag to give the library or collection more space");
+	root_.Add(library_collection_split_).Expand(1).MinMain(DPI(348)).AlignSelf(UiBoxLayout::Align::Stretch);
 
 	Add(drag_preview_);
 }
@@ -215,18 +220,33 @@ void SymbolPickerWorkspaceView::BuildLibrary()
 		.Add("Rounded", (int)SymbolPickerIconStyle::Rounded)
 		.Add("Sharp", (int)SymbolPickerIconStyle::Sharp);
 	library_style_.SetSizeMin(DPI(118), 0);
+	library_optical_.Add("20 optical", 20).Add("48 optical", 48).SetDataSilently(20);
+	library_optical_.Tip("Optical design changes stroke and detail; export pixel size stays independent");
+	library_filled_.SetText("Filled");
 	tint_label_.SetText("Tint");
 	library_tint_ <<= Black();
+	library_tint_.NullText("Auto");
+	library_tint_.Tip("Foreground tint; Auto uses the theme's icon colour");
+	background_label_.SetText("Background");
+	preview_background_ <<= Color(Null);
+	preview_background_.NullText("Auto");
+	preview_background_.Tip("Tile background in both galleries; Auto follows the theme. Preview only; exports stay transparent.");
 	library_zoom_in_.SetText("+").Tip("Zoom in");
 	library_zoom_out_.SetText("−").Tip("Zoom out");
 	library_zoom_.SetTextUtf8("100%").Tip("Zoom percentage; press Enter to apply");
 	library_zoom_hint_.SetCustomStyle(StatusStyle()).SetText("Ctrl + wheel to zoom");
 	library_filter_.SetPlaceholder("Search symbols");
+	library_include_metadata_.SetText("Include metadata").SetChecked(true);
+	library_include_metadata_.Tip("Include embedded Google search tags; turn off to match symbol names and IDs only");
 	import_assets_.SetText("Import…").Tip("Add SVG or image files to the library; the project keeps file references.");
 
 	library_actions_.Add(library_style_).Fit().MinMain(DPI(118));
+	library_actions_.Add(library_optical_).Fixed(DPI(105));
+	library_actions_.Add(library_filled_).Fit();
 	library_actions_.Add(tint_label_).Fit();
 	library_actions_.Add(library_tint_).Fixed(DPI(42)).MinCross(DPI(24));
+	library_actions_.Add(background_label_).Fit();
+	library_actions_.Add(preview_background_).Fixed(DPI(42)).MinCross(DPI(24));
 	library_actions_.Add(library_zoom_in_).Fixed(DPI(30));
 	library_actions_.Add(library_zoom_).Fixed(DPI(64));
 	library_actions_.Add(library_zoom_out_).Fixed(DPI(30));
@@ -234,6 +254,7 @@ void SymbolPickerWorkspaceView::BuildLibrary()
 	library_actions_.Add(import_assets_).Fixed(DPI(76));
 	library_actions_.AddSpacer(1).Expand(1).MinMain(DPI(8));
 	library_actions_.Add(library_filter_).Expand(1).MinMain(DPI(220));
+	library_actions_.Add(library_include_metadata_).Fit();
 
 	library_gallery_.SetDragSource(SymbolPickerGestureSourceKind::Library)
 	                .SetModel(library_projection_.Model())
@@ -333,6 +354,12 @@ void SymbolPickerWorkspaceView::BuildCollections()
 
 void SymbolPickerWorkspaceView::ConfigureGalleryRenderers()
 {
+	const auto t = UiTheme::GetOliveTokens(UiTheme::GetMode());
+	Color background = (Color)~preview_background_;
+	if(IsNull(background)) background = t.panel;
+	Color label_ink = IsNull((Color)~preview_background_) ? t.text
+		: (background.GetR() * 299 + background.GetG() * 587 + background.GetB() * 114 > 145000
+		   ? UiTheme::GetOliveTokens(UiThemeMode::Light).text : UiTheme::GetOliveTokens(UiThemeMode::Dark).text);
 	UiItemRenderImage library_render;
 	UiItemRenderStyle library_style = library_render.GetStyle();
 	library_style.image_extent = DPI(24);
@@ -341,9 +368,21 @@ void SymbolPickerWorkspaceView::ConfigureGalleryRenderers()
 	library_style.metrics.content_margin = Rect(DPI(3), DPI(3), DPI(3), DPI(4));
 	library_style.metrics.radius = DPI(4);
 	library_style.metrics.face_enabled = true;
-	library_style.palette.face[ST_PRESSED] = UiFill::Solid(Color(96, 165, 250));
-	library_style.palette.frame[ST_PRESSED] = Color(37, 99, 235);
-	library_style.palette.ink[ST_PRESSED] = Color(15, 23, 42);
+	library_style.metrics.frame_enabled = true;
+	library_style.metrics.frame_width = 1;
+	library_style.metrics.shadow.enabled = false;
+	library_style.metrics.highlight.enabled = false;
+	for(int state = 0; state < 4; ++state) {
+		library_style.palette.face[state] = UiFill::Solid(background);
+		library_style.palette.frame[state] = t.line_soft;
+		library_style.palette.ink[state] = label_ink;
+	}
+	library_style.palette.face[ST_HOT] = UiFill::Solid(Blend(background, t.accent, 12));
+	library_style.palette.face[ST_PRESSED] = UiFill::Solid(Blend(background, t.accent, 30));
+	library_style.palette.frame[ST_HOT] = t.line;
+	library_style.palette.frame[ST_PRESSED] = t.accent;
+	library_style.palette.ink[ST_DISABLED] = t.disabled_ink;
+	library_style.metadata_default = t.accent;
 	library_style.show_description = false;
 	library_style.show_right_text = false;
 	library_style.show_metadata = false;
@@ -359,6 +398,11 @@ void SymbolPickerWorkspaceView::ConfigureGalleryRenderers()
 		gallery->ClearCustomStyle();
 		auto style = gallery->GetStyle();
 		style.metrics.radius = DPI(8);
+		style.metrics.frame_width = 1;
+		style.palette.frame[ST_NORMAL] = t.line_soft;
+		style.marquee_fill = t.active;
+		style.marquee_frame = style.selection_frame = t.accent;
+		style.marquee_frame_width = style.selection_frame_width = 1;
 		style.skin = StyledSkin();
 		gallery->SetCustomStyle(style);
 	}
@@ -367,6 +411,7 @@ void SymbolPickerWorkspaceView::ConfigureGalleryRenderers()
 		panel->ClearCustomStyle();
 		panel->SetRadius(DPI(8));
 	}
+	library_collection_split_.ClearCustomStyle();
 
 }
 
@@ -395,6 +440,11 @@ void SymbolPickerWorkspaceView::ApplyThemeState()
 void SymbolPickerWorkspaceView::Skin()
 {
 	if(ui_ready_) ApplyThemeState();
+}
+
+void SymbolPickerWorkspaceView::Paint(Draw& w)
+{
+	w.DrawRect(GetSize(), UiTheme::GetOliveTokens(UiTheme::GetMode()).background);
 }
 
 void SymbolPickerWorkspaceView::WireActions()
@@ -441,7 +491,7 @@ void SymbolPickerWorkspaceView::WireActions()
 		BeginCommandBatch();
 		commands_->Execute(MakeSymbolPickerSetIconStyleCommand(style), *model_);
 		if(catalog_ && model_->GetCurrentCategory() != "All" &&
-		   catalog_->Filter(model_->GetCurrentCategory(), String(), style).IsEmpty())
+		   catalog_->Filter(model_->GetCurrentCategory(), String(), style, library_asset_kind_, true, model_->GetOpticalSize(), model_->GetFilled()).IsEmpty())
 			commands_->Execute(MakeSymbolPickerSetCategoryCommand("All"), *model_);
 		EndCommandBatch();
 	};
@@ -449,6 +499,14 @@ void SymbolPickerWorkspaceView::WireActions()
 		if(!syncing_ && model_ && commands_)
 			commands_->Execute(MakeSymbolPickerSetTintCommand((Color)~library_tint_), *model_);
 	};
+	preview_background_.WhenAction = [=] { ConfigureGalleryRenderers(); };
+	library_optical_.WhenSelectData = [=](const Value&) {
+		if(!syncing_ && model_ && commands_) commands_->Execute(MakeSymbolPickerSetMaterialVariantCommand((int)library_optical_.GetData(), library_filled_.IsChecked()), *model_);
+	};
+	library_filled_.WhenAction = [=] {
+		if(!syncing_ && model_ && commands_) commands_->Execute(MakeSymbolPickerSetMaterialVariantCommand((int)library_optical_.GetData(), library_filled_.IsChecked()), *model_);
+	};
+	library_include_metadata_.WhenAction = [=] { RefreshLibraryProjection(true); UpdateLibraryStatus(); };
 	library_filter_.WhenAction = [=] { ApplyLibraryFilter(); };
 	library_filter_.WhenChange = [=] {
 		if(syncing_)
@@ -656,6 +714,8 @@ void SymbolPickerWorkspaceView::RefreshFromModel()
 void SymbolPickerWorkspaceView::SyncLibraryControls()
 {
 	library_style_.SetDataSilently((int)model_->GetIconStyle());
+	library_optical_.SetDataSilently(model_->GetOpticalSize());
+	library_filled_.SetChecked(model_->GetFilled());
 	if(library_filter_.GetTextUtf8() != model_->GetFilterText())
 		library_filter_.SetTextUtf8(model_->GetFilterText());
 	library_tint_ <<= model_->GetTintColor();
@@ -688,12 +748,14 @@ void SymbolPickerWorkspaceView::RefreshCategoryButtons()
 	categories_title_.SetText(library_asset_kind_ == 1 ? "Image categories" : "Icon categories");
 	symbols_view_.SetChecked(library_asset_kind_ == 0); images_view_.SetChecked(library_asset_kind_ == 1);
 	library_style_.Enable(library_asset_kind_ == 0);
+	library_optical_.Enable(library_asset_kind_ == 0);
+	library_filled_.Enable(library_asset_kind_ == 0);
 	String filter = categories_filter_.GetTextUtf8();
 	Vector<SymbolPickerCategory> categories;
 	int total = 0;
 	if(catalog_) {
 		SymbolPickerIconStyle style = model_ ? model_->GetIconStyle() : SymbolPickerIconStyle::Outlined;
-		categories = catalog_->GetCategories(style, library_asset_kind_);
+		categories = catalog_->GetCategories(style, library_asset_kind_, model_ ? model_->GetOpticalSize() : 20, model_ && model_->GetFilled());
 		for(const auto& category : categories)
 			total += category.icon_count;
 	}
@@ -701,18 +763,21 @@ void SymbolPickerWorkspaceView::RefreshCategoryButtons()
 	auto AddCategory = [&](const String& id, const String& text, int palette_index) {
 		UiButton& button = category_buttons_.Add(new UiButton());
 		auto style = UiTheme::ResolveButton();
-		bool dark = UiTheme::GetMode() == UiThemeMode::Dark;
+		const auto t = UiTheme::GetOliveTokens(UiTheme::GetMode());
 		Color tint = CategoryTint(palette_index, categories.GetCount() + 1);
-		Color face = dark ? Blend(Color(25, 32, 44), tint, 85) : tint;
+		Color face = tint;
 		style.skin = StyledSkin();
 		style.metrics.face_enabled = true;
 		style.metrics.radius = DPI(8);
 		style.palette.face[ST_NORMAL] = UiFill::Solid(face);
-		style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, dark ? White() : Black(), 20));
-		style.palette.face[ST_PRESSED] = UiFill::Solid(dark ? Blend(face, tint, 100) : Blend(tint, Color(65, 100, 150), 55));
-		style.palette.ink[ST_NORMAL] = dark ? White() : Color(35, 45, 60);
-		style.palette.ink[ST_PRESSED] = style.palette.ink[ST_NORMAL];
-		style.palette.frame[ST_PRESSED] = dark ? tint : Blend(tint, Color(45, 75, 115), 140);
+		style.metrics.frame_width = 1;
+		style.metrics.content_margin = Rect(DPI(4), DPI(3), DPI(4), DPI(3));
+		style.palette.face[ST_HOT] = UiFill::Solid(Blend(face, t.accent, 24));
+		style.palette.face[ST_PRESSED] = UiFill::Solid(t.active);
+		style.palette.ink[ST_NORMAL] = style.palette.ink[ST_HOT] = t.text;
+		style.palette.ink[ST_PRESSED] = t.accent;
+		style.palette.frame[ST_NORMAL] = style.palette.frame[ST_HOT] = t.line_soft;
+		style.palette.frame[ST_PRESSED] = t.accent;
 		button.SetCustomStyle(style);
 		button.SetText(text).SetCheckable(true).SetChecked(selected == id).SetContentInset(DPI(4));
 		categories_flow_.Add(button).Fit().AlignSelf(UiBoxLayout::Align::Stretch);
@@ -749,20 +814,15 @@ void SymbolPickerWorkspaceView::RefreshLibraryProjection(bool preserve_selection
 #ifdef _DEBUG
 	int64 started = msecs();
 #endif
-	library_projection_.Rebuild(*catalog_, model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle(), library_asset_kind_);
+	library_projection_.Rebuild(*catalog_, model_->GetCurrentCategory(), model_->GetFilterText(), model_->GetIconStyle(), library_asset_kind_, library_include_metadata_.IsChecked(), model_->GetOpticalSize(), model_->GetFilled());
 	String category = model_->GetCurrentCategory();
-	auto categories = catalog_->GetCategories(model_->GetIconStyle(), library_asset_kind_);
-	int palette_index = 0;
+	auto categories = catalog_->GetCategories(model_->GetIconStyle(), library_asset_kind_, model_->GetOpticalSize(), model_->GetFilled());
 	for(int i = 0; i < categories.GetCount(); ++i)
 		if(categories[i].id == category) {
 			category = categories[i].display_name;
-			palette_index = i + 1;
 			break;
 		}
-	Color tint = CategoryTint(palette_index, categories.GetCount() + 1);
 	auto heading = HeadingStyle();
-	heading.palette.ink[ST_NORMAL] = UiTheme::GetMode() == UiThemeMode::Dark
-		? tint : Blend(tint, Color(30, 40, 55), 175);
 	library_title_.SetCustomStyle(heading).SetText(String(library_asset_kind_ == 1 ? "Images · " : "Library · ") + category + Format(" · %d", library_projection_.GetCount()));
 
 	if(preserve_selection)
@@ -837,14 +897,13 @@ void SymbolPickerWorkspaceView::EnsureImageGeneration()
 
 Color SymbolPickerWorkspaceView::GetLibraryPreviewTint() const
 {
-	if(UiTheme::GetMode() == UiThemeMode::Dark)
-		return White();
-	return model_ ? model_->GetTintColor() : Color(Null);
+	Color tint = model_ ? model_->GetTintColor() : Color(Null);
+	return IsNull(tint) ? UiTheme::GetOliveTokens(UiTheme::GetMode()).text : tint;
 }
 
 Color SymbolPickerWorkspaceView::GetCollectionPreviewTint(const SymbolPickerIconRef& ref) const
 {
-	return UiTheme::GetMode() == UiThemeMode::Dark ? White() : ref.tint;
+	return IsNull(ref.tint) ? UiTheme::GetOliveTokens(UiTheme::GetMode()).text : ref.tint;
 }
 
 void SymbolPickerWorkspaceView::PrepareLibraryImages(int first, int last)
@@ -949,7 +1008,7 @@ void SymbolPickerWorkspaceView::UpdateCollectionStatus()
 	collections_status_.ClearSpans().AddTextSpan(text);
 	if(used) {
 		ImageBuffer marker(DPI(6), DPI(6));
-		Fill(~marker, Color(59, 130, 246), marker.GetLength());
+		Fill(~marker, UiTheme::GetOliveTokens(UiTheme::GetMode()).accent, marker.GetLength());
 		collections_status_.AddTextSpan("    ").AddIconSpan(Image(marker))
 			.AddTextSpan(Format(" %d marked in use", used));
 	}
@@ -1021,7 +1080,7 @@ bool SymbolPickerWorkspaceView::RunSearchSmokeTests(String& error)
 		KillTimeCallback(TIMEID_LIBRARY_FILTER);
 		ApplyLibraryFilter();
 		if(library_filter_.GetCursor() != caret) { error = "Library filter refresh moved the caret."; return false; }
-		if(library_gallery_.Model().GetCount() != catalog_->Filter(model_->GetCurrentCategory(), query, model_->GetIconStyle(), library_asset_kind_).GetCount()) {
+		if(library_gallery_.Model().GetCount() != catalog_->Filter(model_->GetCurrentCategory(), query, model_->GetIconStyle(), library_asset_kind_, library_include_metadata_.IsChecked(), model_->GetOpticalSize(), model_->GetFilled()).GetCount()) {
 			error = "Library filter count differs from catalogue."; return false;
 		}
 		collection_filter_.SetTextUtf8(query);
@@ -1041,10 +1100,21 @@ bool SymbolPickerWorkspaceView::RunSearchSmokeTests(String& error)
 	library_zoom_.WhenAction();
 	if(library_zoom_.GetTextUtf8() != "125%") { error = "Invalid zoom was not restored."; return false; }
 	library_gallery_.SetZoom(original_zoom);
+	// Preview background stays independent of exported foreground and survives theme changes.
+	Color preview_test_color(65, 72, 58);
+	preview_background_ <<= preview_test_color;
+	preview_background_.WhenAction();
+	if((Color)~preview_background_ != preview_test_color ||
+	   model_->GetTintColor() != original.default_tint) {
+		error = "Preview background changed the exported foreground tint."; return false;
+	}
 	// Exercise the same theme transition as the toolbar, including custom surfaces.
 	for(int transition = 0; transition < 4; ++transition) {
 		theme_button_.WhenAction();
 		const auto surface = UiTheme::ResolvePanel();
+		if(UiTheme::GetPreset() != UiThemePreset::Olive || (Color)~preview_background_ != preview_test_color) {
+			error = "Theme transition lost Olive or the chosen preview background."; return false;
+		}
 		for(UiPanel* panel : { &categories_panel_, &library_panel_, &collections_panel_ })
 			if(panel->GetStyle().palette.face[ST_NORMAL].color != surface.palette.face[ST_NORMAL].color) {
 				error = "Panel retained a surface from the previous theme."; return false;
@@ -1058,6 +1128,8 @@ bool SymbolPickerWorkspaceView::RunSearchSmokeTests(String& error)
 			error = "Search entry did not follow the current theme."; return false;
 		}
 	}
+	preview_background_ <<= Color(Null);
+	preview_background_.WhenAction();
 	error.Clear();
 	return true;
 }

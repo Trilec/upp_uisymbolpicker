@@ -23,7 +23,7 @@ bool RunSymbolPickerMaintenanceTests(String& error)
 		}
 		auto& retired = current.Add(); retired.category = "action"; retired.name = "retired"; retired.style = 0; retired.source = "retired.svg"; retired.packed_svg = Base64Encode(ZCompress(svg));
 		String metadata = AppendFileName(folder, "metadata.json");
-		Put(metadata, "{\"icons\":[{\"name\":\"old\",\"categories\":[\"Actions\"]},{\"name\":\"new\",\"categories\":[\"Activities\",\"Business\"]}]}" );
+		Put(metadata, "{\"icons\":[{\"name\":\"old\",\"categories\":[\"Actions\"]},{\"name\":\"new\",\"tags\":[\"grip\",\"rearrange\"],\"categories\":[\"Activities\",\"Business\"]}]}" );
 		Put(AppendFileName(source, "LICENSE"), "fixture license");
 		SymbolPickerMaintenanceJob job; SymbolPickerMaintenanceResult compare;
 		CompareSymbolPickerSources(current, source, metadata, folder, true, job, compare);
@@ -32,6 +32,7 @@ bool RunSymbolPickerMaintenanceTests(String& error)
 		Require(ValueArray(compare.report["missing_variants"]).GetCount() == 3, "Missing variants were counted incorrectly.");
 		Require(ValueArray(compare.report["removed_upstream_variants_retained"]).GetCount() == 1, "Retired artwork was not reported.");
 		Require((int)compare.report["staged_category_rows"] == 10, "New memberships or retained IDs were lost.");
+		Require(LoadFile(AppendFileName(compare.stage, "SearchTags.h")).Find("grip rearrange") >= 0, "Refresh did not preserve Google search tags.");
 		Require(FileExists(AppendFileName(compare.stage, "icons_activitie.h")) && FileExists(AppendFileName(compare.stage, "icons_busines.h")), "Historical category naming changed.");
 		Put(AppendFileName(source, "symbols/web/old/" + String(styles[1]) + "/old_24px.svg"), "<svg><path d=\"M1 1h10v10z\"/></svg>");
 		SymbolPickerMaintenanceResult changed; CompareSymbolPickerSources(current, source, metadata, folder, false, job, changed);

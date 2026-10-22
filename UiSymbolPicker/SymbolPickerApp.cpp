@@ -39,6 +39,7 @@ bool SymbolPickerApp::Init(String& error, bool run_tests)
 		entry.image_factory = icon.factory;
 		catalog_.Add(entry);
 	}
+	if(run_tests && !RunSymbolPickerVariantTests(catalog_, error)) return false;
 	if(run_tests && !RunSymbolPickerCustomAssetSmokeTests(error)) return false;
 	if(run_tests && !RunSymbolPickerLibraryProjectionSmokeTests(catalog_, error))
 		return false;

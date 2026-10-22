@@ -36,6 +36,7 @@ private:
 
 One<SymbolPickerCommand> MakeSymbolPickerSetThemePresetCommand(UiThemePreset preset);
 One<SymbolPickerCommand> MakeSymbolPickerSetIconStyleCommand(SymbolPickerIconStyle style);
+One<SymbolPickerCommand> MakeSymbolPickerSetMaterialVariantCommand(int optical_size, bool filled);
 One<SymbolPickerCommand> MakeSymbolPickerSetCategoryCommand(const String& category);
 One<SymbolPickerCommand> MakeSymbolPickerSetFilterCommand(const String& text);
 One<SymbolPickerCommand> MakeSymbolPickerSetTintCommand(Color color);

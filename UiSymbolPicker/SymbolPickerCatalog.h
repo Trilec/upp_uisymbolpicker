@@ -10,7 +10,10 @@ struct SymbolPickerIconEntry : Moveable<SymbolPickerIconEntry> {
 	String                source_id;
 	String                category;
 	String                display_name;
+	String                search_tags;
 	SymbolPickerIconStyle style = SymbolPickerIconStyle::Outlined;
+	int                   optical_size = 24;
+	bool                  filled = false;
 	String                source_symbol;
 	bool                  available = true;
 	UiIconFactoryFn       image_factory = nullptr;
@@ -35,11 +38,11 @@ public:
 
 	const Vector<SymbolPickerIconEntry>& GetIcons() const;
 	Vector<SymbolPickerCategory> GetCategories() const;
-	Vector<SymbolPickerCategory> GetCategories(SymbolPickerIconStyle style, int kind = -1) const;
+	Vector<SymbolPickerCategory> GetCategories(SymbolPickerIconStyle style, int kind = -1, int optical_size = 24, bool filled = false) const;
 
 	Vector<int> Filter(const String& category,
 		const String& text,
-		SymbolPickerIconStyle style, int kind = -1) const;
+		SymbolPickerIconStyle style, int kind = -1, bool include_metadata = true, int optical_size = 24, bool filled = false) const;
 
 	const SymbolPickerIconEntry* FindByCatalogId(const String& catalog_id) const;
 	const SymbolPickerIconEntry* FindBySourceId(const String& source_id) const;

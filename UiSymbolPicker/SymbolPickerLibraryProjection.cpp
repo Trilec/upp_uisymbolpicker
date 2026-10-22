@@ -12,9 +12,9 @@ void SymbolPickerLibraryProjection::Clear()
 void SymbolPickerLibraryProjection::Rebuild(const SymbolPickerCatalog& catalog,
 	const String& category,
 	const String& text,
-	SymbolPickerIconStyle style, int kind)
+	SymbolPickerIconStyle style, int kind, bool include_metadata, int optical_size, bool filled)
 {
-	Vector<int> filtered = catalog.Filter(category, text, style, kind);
+	Vector<int> filtered = catalog.Filter(category, text, style, kind, include_metadata, optical_size, filled);
 	Vector<int> rows;
 	Vector<UiModelItem> items;
 	rows.Reserve(filtered.GetCount());

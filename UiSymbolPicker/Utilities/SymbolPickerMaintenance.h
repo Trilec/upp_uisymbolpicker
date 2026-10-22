@@ -10,6 +10,8 @@ namespace Upp {
 struct SymbolPickerSourceRow : Moveable<SymbolPickerSourceRow> {
 	String category, name, source, packed_svg;
 	int style = 0;
+	int optical_size = 24;
+	bool filled = false;
 };
 
 struct SymbolPickerMaintenanceJob {
@@ -40,6 +42,8 @@ void ScanSymbolPickerUsage(const String& project, const String& code_root,
                           SymbolPickerMaintenanceResult& result);
 void ApplySymbolPickerUsage(const SymbolPickerMaintenanceResult& scan, const String& output,
                            SymbolPickerMaintenanceJob& job, SymbolPickerMaintenanceResult& result);
+bool BuildSymbolPickerRenderVariants(const Vector<SymbolPickerSourceRow>& current, const String& source,
+                                    SymbolPickerMaintenanceJob& job, String& header, ValueMap& report);
 bool RunSymbolPickerMaintenanceTests(String& error);
 
 }

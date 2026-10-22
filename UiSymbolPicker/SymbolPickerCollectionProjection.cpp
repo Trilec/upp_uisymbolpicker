@@ -42,7 +42,8 @@ void SymbolPickerCollectionProjection::Rebuild(const SymbolPickerCollection& col
 		item.right_text = Format("%d px", ref.size);
 		if(ref.marked_used) {
 			item.has_metadata = true;
-			item.metadata_color = Color(59, 130, 246);
+			// The renderer supplies the current theme's usage marker colour.
+			item.metadata_color = Null;
 		}
 		if(ref.unresolved || !entry || !entry->available) {
 			item.custom_ink_color = Color(226, 141, 0);

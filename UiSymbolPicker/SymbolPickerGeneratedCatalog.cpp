@@ -1,6 +1,8 @@
 #include "SymbolPickerGeneratedCatalog.h"
 #include "SymbolPickerCatalogSeed.h"
 #include "Generated/CatalogTables.h"
+#include "Generated/SearchTags.h"
+#include "Generated/RenderVariants.h"
 
 
 namespace Upp {
@@ -56,6 +58,7 @@ static int AddGeneratedRows(SymbolPickerCatalog& catalog, const T* rows, int cou
 		SymbolPickerIconEntry e;
 		e.category = row.category;
 		e.display_name = MakeDisplayNameGenerated(row.name);
+		e.search_tags = SymbolPickerSearchTags().Get(row.name, String());
 		e.source_id = String(row.category) + "/" + row.name;
 		e.style = ToPickerStyleGenerated((int)row.style);
 		e.catalog_id = MakeCatalogIdGenerated(row);
@@ -91,6 +94,8 @@ struct GeneratedPayloadRow : Moveable<GeneratedPayloadRow> {
 	String source;
 	String catalog_id;
 	SymbolPickerIconStyle style = SymbolPickerIconStyle::Outlined;
+	int optical_size = 24;
+	bool filled = false;
 	const char* b64z = nullptr;
 };
 
@@ -133,6 +138,28 @@ static void EnsureGeneratedLookup()
 #define INDEX_TABLE(ns) AppendGeneratedIndexRows(ns::kIcons, ns::kIconCount);
 	SYMBOLPICKER_GENERATED_ICON_TABLES(INDEX_TABLE);
 #undef INDEX_TABLE
+	VectorMap<String, int> variants;
+	for(int i = 0; kSymbolPickerRenderVariants[i].name; ++i) {
+		const auto& row = kSymbolPickerRenderVariants[i];
+		variants.Add(String(row.name) + "/" + AsString(row.style) + "/" + AsString(row.optical) + (row.filled ? "/filled" : "/unfilled"), i);
+	}
+	int legacy_count = rows.GetCount();
+	for(int i = 0; i < legacy_count; ++i) {
+		GeneratedPayloadRow base = clone(rows[i]);
+		for(int optical : {20, 48}) for(bool filled : {false, true}) {
+			String suffix = "/" + AsString(optical) + (filled ? "/filled" : "/unfilled");
+			int q = variants.Find(base.name + "/" + AsString((int)base.style) + suffix);
+			if(q < 0) continue;
+			const auto& payload = kSymbolPickerRenderVariants[variants[q]];
+			GeneratedPayloadRow item = clone(base);
+			item.optical_size = optical; item.filled = filled; item.catalog_id << suffix;
+			item.source = "symbols/web/" + base.name + "/materialsymbols" + StyleSuffixGenerated(base.style) + "/" + base.name
+				+ (filled ? "_fill1_" : "_") + AsString(optical) + "px.svg";
+			item.b64z = payload.packed;
+			GeneratedLookupStorage().Add(item.catalog_id, rows.GetCount()); rows.Add(pick(item));
+		}
+	}
+
 }
 
 void GetSymbolPickerSourceRows(Vector<SymbolPickerSourceRow>& output)
@@ -145,6 +172,7 @@ void GetSymbolPickerSourceRows(Vector<SymbolPickerSourceRow>& output)
 		item.name = row.name;
 		item.source = row.source;
 		item.style = (int)row.style;
+		item.optical_size = row.optical_size; item.filled = row.filled;
 		item.packed_svg = row.b64z;
 	}
 }
@@ -159,8 +187,10 @@ int LoadGeneratedSymbolPickerCatalog(SymbolPickerCatalog& catalog)
 		SymbolPickerIconEntry e;
 		e.category = row.category;
 		e.display_name = MakeDisplayNameGenerated(row.name);
+		e.search_tags = SymbolPickerSearchTags().Get(row.name, String());
 		e.source_id = row.category + "/" + row.name;
 		e.style = row.style;
+		e.optical_size = row.optical_size; e.filled = row.filled;
 		e.catalog_id = row.catalog_id;
 		e.source_symbol = row.source;
 		e.available = row.b64z && *row.b64z;
@@ -233,6 +263,18 @@ bool RunSymbolPickerGeneratedCatalogSmokeTests(String& error)
 		return Fail("Generated catalog is missing one or more style variants.");
 	if(!has_action || !has_navigation || !has_content)
 		return Fail("Generated catalog is missing expected categories.");
+
+	for(SymbolPickerIconStyle style : { SymbolPickerIconStyle::Outlined, SymbolPickerIconStyle::Rounded, SymbolPickerIconStyle::Sharp }) {
+		bool found = false;
+		for(int i : generated.Filter("All", "grip", style))
+			found |= generated.GetIcons()[i].source_id.EndsWith("/drag_indicator");
+		if(!found) return Fail("Metadata search did not find Drag Indicator by grip in every style.");
+		for(int i : generated.Filter("All", "grip", style, -1, false))
+			if(generated.GetIcons()[i].source_id.EndsWith("/drag_indicator"))
+				return Fail("Disabling metadata still matched Drag Indicator by grip.");
+		if(generated.Filter("All", "drag_indicator", style, -1, false).IsEmpty())
+			return Fail("Name-only search did not match Drag Indicator.");
+	}
 
 	String svg_xml;
 	if(sample_catalog_id.IsEmpty() || !DecodeGeneratedSymbolPickerSvg(sample_catalog_id, svg_xml) || svg_xml.IsEmpty())

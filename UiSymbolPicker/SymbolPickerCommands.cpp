@@ -243,6 +243,20 @@ private:
 	SymbolPickerIconStyle old_ = SymbolPickerIconStyle::Outlined;
 };
 
+class SetMaterialVariantCommand final : public SymbolPickerCommand {
+public:
+	SetMaterialVariantCommand(int optical, bool filled) : optical_(optical), filled_(filled) {}
+	bool Do(SymbolPickerModel& model) override {
+		old_optical_ = model.GetOpticalSize(); old_filled_ = model.GetFilled();
+		return model.SetMaterialVariant(optical_, filled_);
+	}
+	void Undo(SymbolPickerModel& model) override { model.SetMaterialVariant(old_optical_, old_filled_); }
+	String Label() const override { return "Set optical design and fill"; }
+private:
+	int optical_, old_optical_ = 20;
+	bool filled_, old_filled_ = false;
+};
+
 class SetCategoryCommand final : public SymbolPickerCommand {
 public:
 	SetCategoryCommand(const String& category) : category_(category) {}
@@ -706,6 +720,11 @@ One<SymbolPickerCommand> MakeSymbolPickerSetIconStyleCommand(SymbolPickerIconSty
 	return MakeOne<SetIconStyleCommand>(style);
 }
 
+One<SymbolPickerCommand> MakeSymbolPickerSetMaterialVariantCommand(int optical_size, bool filled)
+{
+	return MakeOne<SetMaterialVariantCommand>(optical_size, filled);
+}
+
 One<SymbolPickerCommand> MakeSymbolPickerSetCategoryCommand(const String& category)
 {
 	return MakeOne<SetCategoryCommand>(category);
@@ -805,7 +824,7 @@ bool RunSymbolPickerCommandSmokeTests(String& error)
 		return Fail("SetThemePreset command did not execute.");
 	if(model.GetThemePreset() != UiThemePreset::Pill)
 		return Fail("SetThemePreset command did not update theme preset.");
-	if(!stack.Undo(model) || model.GetThemePreset() != UiThemePreset::Minimal)
+	if(!stack.Undo(model) || model.GetThemePreset() != UiThemePreset::Olive)
 		return Fail("SetThemePreset undo failed.");
 	if(!stack.Redo(model) || model.GetThemePreset() != UiThemePreset::Pill)
 		return Fail("SetThemePreset redo failed.");

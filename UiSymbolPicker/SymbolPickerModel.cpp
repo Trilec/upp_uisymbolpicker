@@ -72,6 +72,15 @@ bool SymbolPickerModel::SetIconStyle(SymbolPickerIconStyle style)
 	return true;
 }
 
+bool SymbolPickerModel::SetMaterialVariant(int optical_size, bool filled)
+{
+	if(optical_size != 20 && optical_size != 48) return false;
+	if(optical_size_ == optical_size && filled_ == filled) return false;
+	optical_size_ = optical_size; filled_ = filled;
+	Changed(CHANGE_LIBRARY | CHANGE_PROJECT);
+	return true;
+}
+
 bool SymbolPickerModel::SetCurrentCategory(const String& category)
 {
 	String next = TrimBoth(category);
@@ -375,6 +384,8 @@ SymbolPickerProject SymbolPickerModel::ExportProject() const
 	project.default_size = export_size_;
 	project.default_tint = tint_color_;
 	project.default_style = icon_style_;
+	project.default_optical_size = optical_size_;
+	project.default_filled = filled_;
 	project.active_collection_index = active_collection_index_;
 	for(const auto& collection : collections_) {
 		SymbolPickerCollection copy = CopyCollectionModel(collection);
@@ -404,6 +415,8 @@ bool SymbolPickerModel::LoadProject(const SymbolPickerProject& project)
 	export_size_ = max(1, project.default_size);
 	tint_color_ = project.default_tint;
 	icon_style_ = project.default_style;
+	optical_size_ = project.default_optical_size == 48 ? 48 : 20;
+	filled_ = project.default_filled;
 	collections_.Clear();
 	for(const auto& collection : project.collections) {
 		SymbolPickerCollection copy = CopyCollectionModel(collection);

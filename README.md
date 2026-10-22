@@ -5,7 +5,9 @@ A U++ desktop tool for finding, trying and maintaining icons for your applicatio
 ![Symbol Picker in dark theme, showing the symbol library and a shared Ui icons collection](docs/snapshot.jpg)
 
 - Browse 4,150 Material Symbols in outlined, rounded and sharp styles.
-- Filter by category or name and zoom with the buttons or Ctrl+wheel.
+- Choose 20 or 48 optical artwork, with Filled on or off; export pixel size is independent.
+- Filter by category, name or Google search tags and zoom with the buttons or Ctrl+wheel.
+- Resize Library and Collections with the draggable divider.
 - Build application collections, including your own SVGs and images.
 - Save reference-based `.symbolpicker` projects and return to edit them later.
 - Export PNG, SVG, C++ snippets, RAW/RLE headers or U++ IML/header libraries.
@@ -13,7 +15,9 @@ A U++ desktop tool for finding, trying and maintaining icons for your applicatio
 - Scan application code to help mark icons as used.
 
 The gallery renders previews lazily and keeps a bounded cache for large libraries.
-Light and dark themes are supported throughout the main window and utilities.
+Olive light and dark themes are supported throughout the main window and utilities.
+Choose a foreground tint and a preview background to check icons against your
+application's colours. Preview backgrounds apply to both galleries; exports retain transparency.
 
 ## Getting started
 
@@ -45,6 +49,9 @@ the application, place the Release executable in `bin/windows-x64/` and copy the
 optional `assets/` directory beside it. Local binaries and build output are ignored
 by Git.
 
+Prepared release downloads are kept under `bin/release/`, with an unpacked
+Windows x64 bundle, a ZIP, checksums and GitHub release text.
+
 ## Repository layout
 
 ```text
@@ -53,7 +60,8 @@ assets/           optional custom SVG and image sources
 examples/         sample application collections
 docs/             usage and catalogue maintenance guides
 build/            local build output (ignored)
-bin/windows-x64/  release distribution location
+bin/windows-x64/  latest executable and optional assets
+bin/release/      prepared release bundle and ZIP (ignored)
 ```
 
 ## Licence

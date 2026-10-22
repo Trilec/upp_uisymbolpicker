@@ -14,7 +14,7 @@ public:
 	void Rebuild(const SymbolPickerCatalog& catalog,
 		const String& category,
 		const String& text,
-		SymbolPickerIconStyle style, int kind = -1);
+		SymbolPickerIconStyle style, int kind = -1, bool include_metadata = true, int optical_size = 24, bool filled = false);
 
 	UiListModel& Model() { return model_; }
 	const UiListModel& Model() const { return model_; }

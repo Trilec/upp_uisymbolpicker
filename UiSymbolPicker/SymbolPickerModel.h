@@ -64,6 +64,8 @@ struct SymbolPickerProject : Moveable<SymbolPickerProject> {
 	int                           default_size = 48;
 	Color                         default_tint = Null;
 	SymbolPickerIconStyle         default_style = SymbolPickerIconStyle::Outlined;
+	int default_optical_size = 20;
+	bool default_filled = false;
 	Vector<SymbolPickerCollection> collections;
 	int                           active_collection_index = -1;
 };
@@ -72,6 +74,7 @@ class SymbolPickerModel {
 public:
 	bool SetThemePreset(UiThemePreset preset);
 	bool SetIconStyle(SymbolPickerIconStyle style);
+	bool SetMaterialVariant(int optical_size, bool filled);
 	bool SetCurrentCategory(const String& category);
 	bool SetFilterText(const String& text);
 	bool SetTintColor(Color color);
@@ -103,6 +106,8 @@ public:
 
 	UiThemePreset GetThemePreset() const { return theme_preset_; }
 	SymbolPickerIconStyle GetIconStyle() const { return icon_style_; }
+	int GetOpticalSize() const { return optical_size_; }
+	bool GetFilled() const { return filled_; }
 	const String& GetCurrentCategory() const { return current_category_; }
 	const String& GetFilterText() const { return filter_text_; }
 	Color GetTintColor() const { return tint_color_; }
@@ -140,8 +145,10 @@ private:
 
 	void Changed(dword bits = CHANGE_NONE);
 
-	UiThemePreset theme_preset_ = UiThemePreset::Minimal;
+	UiThemePreset theme_preset_ = UiThemePreset::Olive;
 	SymbolPickerIconStyle icon_style_ = SymbolPickerIconStyle::Outlined;
+	int optical_size_ = 20;
+	bool filled_ = false;
 	String current_category_ = "All";
 	String filter_text_;
 	Color tint_color_ = Null;

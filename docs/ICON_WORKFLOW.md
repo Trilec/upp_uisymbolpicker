@@ -145,3 +145,16 @@ before unmarking an icon. This is native U++ code; Python and rg are not runtime
 requirements. Definition files matching the output basename and UiIcons are
 excluded automatically.
 
+
+## Optical design and fill
+
+Material Symbols expose Style, Optical design (20 or 48) and Filled independently.
+The default for new selections is 20 optical, unfilled. Optical design selects the
+SVG drawing; the export size controls the resulting pixel dimensions. Custom SVGs,
+raster images and shared Ui image factories retain their own artwork.
+
+Each collection item saves the exact catalogue ID, including its optical/fill
+variant. Changing the library selectors does not alter existing collection items.
+Older IDs still reference their original unfilled 24 optical SVGs. To change an
+existing icon, replace its collection item with the desired variant and retain the
+public alias if your application already calls it.

@@ -12457,5 +12457,20 @@
   "trilec_fork_remote": "https://github.com/Trilec/material-design-icons.git",
   "trilec_fork_commit": "737e3324305806514d7909874fa1818ae1808232",
   "metadata_url": "https://fonts.google.com/metadata/icons?incomplete=1&key=material_symbols",
-  "metadata_sha256": "c0dcacf496d6f92541eeb32d00eef08f8ef51a8099997a06b799132dd7f7da81"
+  "metadata_sha256": "c0dcacf496d6f92541eeb32d00eef08f8ef51a8099997a06b799132dd7f7da81",
+  "render_variants": {
+    "commit": "737e3324305806514d7909874fa1818ae1808232",
+    "variant_count": 49800,
+    "optical_sizes": [
+      20,
+      48
+    ],
+    "filled": [
+      false,
+      true
+    ],
+    "legacy_optical_size": 24,
+    "header_sha256": "464267b8e81174744eb04594846f1af4246a6ba29a57271ffd20b9bcacfb4561",
+    "source_hash_manifest_sha256": "d169afe9bf8157171f6019ba1237cdd14a922b351cc23ae48fdd13b9ada47f5a"
+  }
 }

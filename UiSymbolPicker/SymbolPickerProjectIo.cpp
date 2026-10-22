@@ -161,6 +161,8 @@ bool SaveSymbolPickerProjectJson(const SymbolPickerProject& project, const Strin
 	root.Set("default_size", max(1, project.default_size));
 	root.Set("default_tint", ColorToHex(project.default_tint));
 	root.Set("default_style", IconStyleToString(project.default_style));
+	root.Set("default_optical_size", project.default_optical_size);
+	root.Set("default_filled", project.default_filled);
 	root.Set("active_collection_index", project.active_collection_index);
 
 	ValueArray collections;
@@ -230,6 +232,8 @@ bool LoadSymbolPickerProjectJson(const String& path, SymbolPickerProject& out, S
 	project.default_size = max(1, (int)JsonGet(root, "default_size", 48));
 	project.default_tint = ColorFromHex(AsString(JsonGet(root, "default_tint")));
 	project.default_style = IconStyleFromString(AsString(JsonGet(root, "default_style", "outlined")));
+	project.default_optical_size = (int)JsonGet(root, "default_optical_size", 20) == 48 ? 48 : 20;
+	project.default_filled = (bool)JsonGet(root, "default_filled", false);
 	project.active_collection_index = (int)JsonGet(root, "active_collection_index", -1);
 
 	ValueArray collections = collections_v;

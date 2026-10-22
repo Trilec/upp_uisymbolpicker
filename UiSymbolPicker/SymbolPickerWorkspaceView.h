@@ -66,6 +66,7 @@ private:
 	void UpdateThemeButton();
 	void ApplyThemeState();
 	void Skin() override;
+	void Paint(Draw& w) override;
 	void SetLibraryAssetKind(int kind);
 
 	void PrepareLibraryImages(int first, int last);
@@ -99,6 +100,7 @@ private:
 	virtual bool Key(dword key, int count) override;
 
 	UiBoxLayout root_ { UiDirection::V };
+	UiSplitter library_collection_split_;
 
 	UiBoxLayout header_ { UiDirection::H };
 	UiLabel app_title_;
@@ -127,14 +129,19 @@ private:
 	UiLabel library_title_;
 	UiLabel library_status_;
 	UiDropdown library_style_;
+	UiDropdown library_optical_;
+	UiCheckBox library_filled_;
 	UiLabel tint_label_;
 	ColorPusher library_tint_;
+	UiLabel background_label_;
+	ColorPusher preview_background_;
 	UiButton library_zoom_in_;
 	UiButton import_assets_;
 	UiLineEdit library_zoom_;
 	UiButton library_zoom_out_;
 	UiLabel library_zoom_hint_;
 	UiLineEdit library_filter_;
+	UiCheckBox library_include_metadata_;
 	SymbolPickerDragGallery library_gallery_;
 
 	UiPanel collections_panel_;

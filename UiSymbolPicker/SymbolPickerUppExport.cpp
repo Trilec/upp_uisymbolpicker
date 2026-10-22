@@ -106,7 +106,7 @@ static String GetItemCategoryLabel(const SymbolPickerProject& project,
 static const SymbolPickerIconEntry* ResolveCatalogEntry(const SymbolPickerCatalog& catalog, const SymbolPickerIconRef& item)
 {
 	const SymbolPickerIconEntry* entry = catalog.FindByCatalogId(item.catalog_id);
-	if(!entry && !item.source_id.IsEmpty())
+	if(!entry && !item.source_id.IsEmpty() && !item.catalog_id.EndsWith("/filled") && !item.catalog_id.EndsWith("/unfilled"))
 		entry = catalog.FindBySourceId(item.source_id);
 	return entry;
 }

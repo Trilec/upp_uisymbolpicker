@@ -190,11 +190,12 @@ void DownloadSymbolPickerSources(const String& remote, const String& output,
 		Vector<String> args; args << "clone" << "--depth=1" << "--filter=blob:none" << "--no-checkout" << "--" << remote << result.snapshot;
 		Git("", args, job);
 		String patterns = "/LICENSE\n/README.md\n";
-		for(int style = 0; style < 3; ++style) patterns << "/symbols/web/*/" << folders[style] << "/*_24px.svg\n";
+		for(int style = 0; style < 3; ++style) for(int optical : {20, 24, 48})
+			patterns << "/symbols/web/*/" << folders[style] << "/*_" << optical << "px.svg\n";
 		// A few patterns avoid quadratic work against the repository's millions of
 		// axis variants. Comparison still selects the exact <name>_24px.svg file.
-		patterns << "!**/*_fill1_24px.svg\n!**/*_wght*_24px.svg\n!**/*_grad*_24px.svg\n";
-		job.Status("Checking out only the baseline SVGs for the three styles.");
+		patterns << "!**/*_fill1_24px.svg\n!**/*_wght*\n!**/*_grad*\n";
+		job.Status("Checking out 20/48 optical designs, filled artwork and legacy 24 px SVGs.");
 		args.Clear(); args << "sparse-checkout" << "set" << "--no-cone" << "--stdin"; Git(result.snapshot, args, job, patterns);
 		args.Clear(); args << "checkout"; Git(result.snapshot, args, job);
 		result.report.Add("remote", remote); result.report.Add("snapshot", result.snapshot);
@@ -248,6 +249,7 @@ void CompareSymbolPickerSources(const Vector<SymbolPickerSourceRow>& current,
 		for(const auto& name : names) for(int style = 0; style < 3; ++style) if(available.Find(Key(name, style)) < 0) { ValueMap m; m.Add("name", name); m.Add("missing_style", styles[style]); incomplete.Add(m); }
 		VectorMap<String, String> old_canonical;
 		for(const auto& row : current) {
+			if(row.optical_size != 24 || row.filled) continue;
 			job.Check();
 			String key = Key(row.name, row.style); prior.FindAdd(key); prior_names.FindAdd(row.name);
 			if(old_canonical.Find(key) < 0) old_canonical.Add(key, CanonicalSvg(ZDecompress(Base64Decode(row.packed_svg))));
@@ -260,6 +262,7 @@ void CompareSymbolPickerSources(const Vector<SymbolPickerSourceRow>& current,
 		}
 		for(const auto& key : prior) if(available.Find(key) < 0) removed.Add(key);
 		ValueMap categories;
+		VectorMap<String, String> search_tags;
 		ValueArray supported_missing, unsupported_snapshot;
 		int supported_count = 0;
 		String metadata_hash;
@@ -273,6 +276,10 @@ void CompareSymbolPickerSources(const Vector<SymbolPickerSourceRow>& current,
 				if(!IsValueMap(value)) throw Exc("The metadata contains an invalid icon entry.");
 				ValueMap icon(value); String name = AsString(Get(icon, "name"));
 				categories.Set(name, Get(icon, "categories", ValueArray()));
+				String words;
+				Value tags = Get(icon, "tags", ValueArray());
+				if(IsValueArray(tags)) for(Value tag : ValueArray(tags)) { if(!words.IsEmpty()) words.Cat(' '); words << AsString(tag); }
+				if(!words.IsEmpty()) { String& existing = search_tags.GetAdd(name); if(!existing.IsEmpty()) existing.Cat(' '); existing << words; }
 				Index<String> excluded;
 				Value families = Get(icon, "unsupported_families", ValueArray());
 				if(IsValueArray(families)) for(Value family : ValueArray(families)) excluded.FindAdd(AsString(family));
@@ -298,7 +305,8 @@ void CompareSymbolPickerSources(const Vector<SymbolPickerSourceRow>& current,
 		String folder = WorkFolder(output, prepare ? "prepare" : "compare");
 		if(prepare && !blocked) {
 			job.Status("Preparing headers in a separate folder. Keeping existing IDs and retired artwork.");
-			Vector<SymbolPickerSourceRow> rows = clone(current);
+			Vector<SymbolPickerSourceRow> rows;
+			for(const auto& row : current) if(row.optical_size == 24 && !row.filled) rows.Add(clone(row));
 			for(auto& row : rows) { int i = available.Find(Key(row.name, row.style)); if(i >= 0) { row.packed_svg = Base64Encode(ZCompress(available[i].svg)); row.source = available[i].path; } }
 			Index<String> ids;
 			for(const auto& row : rows) ids.FindAdd(row.category + "/" + Key(row.name, row.style));
@@ -331,11 +339,24 @@ void CompareSymbolPickerSources(const Vector<SymbolPickerSourceRow>& current,
 				header << table << "};\nstatic const int kIconCount = sizeof(kIcons) / sizeof(kIcons[0]);\n}\n#endif\n";
 				String filename = "icons_" + cat + ".h"; Write(AppendFileName(result.stage, filename), header); files.Add(filename, SHA256String(header));
 			}
+			Vector<SymbolPickerSourceRow> variant_basis = clone(rows);
+			for(const auto& row : current) if(row.optical_size != 24 || row.filled) variant_basis.Add(clone(row));
+			String render_header; ValueMap render_report;
+			if(BuildSymbolPickerRenderVariants(variant_basis, source, job, render_header, render_report)) {
+				Write(AppendFileName(result.stage, "RenderVariants.h"), render_header);
+				files.Add("RenderVariants.h", SHA256String(render_header));
+				result.report.Add("render_variants", render_report);
+			}
 			String manifest = "// Generated catalogue includes and table iteration.\n";
 			for(const auto& cat : cats) manifest << "#include \"icons_" << cat << ".h\"\n";
 			manifest << "\n#define SYMBOLPICKER_GENERATED_ICON_TABLES(OP) \\\n";
 			for(int i = 0; i < cats.GetCount(); ++i) manifest << "\tOP(" << cats[i] << ")" << (i + 1 < cats.GetCount() ? " \\\n" : "\n");
 			Write(AppendFileName(result.stage, "CatalogTables.h"), manifest); files.Add("CatalogTables.h", SHA256String(manifest));
+			String tag_header = "// Google Fonts Material Symbols search tags; generated during catalogue maintenance.\n#ifndef _SymbolPicker_SearchTags_h_\n#define _SymbolPicker_SearchTags_h_\nnamespace Upp {\ninline const VectorMap<String, String>& SymbolPickerSearchTags() {\n static const VectorMap<String, String> tags = [] {\n  static const struct { const char* name; const char* words; } rows[] = {\n";
+			for(int i = 0; i < search_tags.GetCount(); ++i)
+				tag_header << "   {" << AsCString(search_tags.GetKey(i)) << ", " << AsCString(search_tags[i]) << "},\n";
+			tag_header << "   {nullptr, nullptr}\n  };\n  VectorMap<String, String> out;\n  for(const auto& row : rows) if(row.name) out.Add(row.name, row.words);\n  return out;\n }();\n return tags;\n}\n}\n#endif\n";
+			Write(AppendFileName(result.stage, "SearchTags.h"), tag_header); files.Add("SearchTags.h", SHA256String(tag_header));
 			String license = LoadFile(AppendFileName(source, "LICENSE"));
 			if(license.IsVoid()) throw Exc("Source LICENSE is missing; cannot prepare a redistributable catalogue.");
 			Write(AppendFileName(result.stage, "MaterialSymbols.LICENSE"), license); files.Add("MaterialSymbols.LICENSE", SHA256String(license));
@@ -373,7 +394,7 @@ void InstallSymbolPickerRefresh(const String& stage, const String& picker_source
 		if(files.GetCount() < 4 || files.Find("CatalogTables.h") < 0 || files.Find("provenance.json") < 0 || files.Find("MaterialSymbols.LICENSE") < 0) throw Exc("The refresh receipt is incomplete.");
 		for(int i = 0; i < files.GetCount(); ++i) {
 			job.Check(); String name = AsString(files.GetKey(i));
-			if(GetFileName(name) != name || name.Find('/') >= 0 || name.Find('\\') >= 0 || name.Find(':') >= 0 || !(name == "CatalogTables.h" || name == "provenance.json" || name == "MaterialSymbols.LICENSE" || name.StartsWith("icons_") && name.EndsWith(".h"))) throw Exc("Invalid refresh filename.");
+			if(GetFileName(name) != name || name.Find('/') >= 0 || name.Find('\\') >= 0 || name.Find(':') >= 0 || !(name == "CatalogTables.h" || name == "SearchTags.h" || name == "RenderVariants.h" || name == "provenance.json" || name == "MaterialSymbols.LICENSE" || name.StartsWith("icons_") && name.EndsWith(".h"))) throw Exc("Invalid refresh filename.");
 			String content = LoadFile(AppendFileName(stage, name));
 			if(content.IsVoid() || SHA256String(content) != AsString(files.GetValue(i))) throw Exc("A prepared file has changed. Prepare the refresh again before installing it.");
 		}
@@ -383,7 +404,7 @@ void InstallSymbolPickerRefresh(const String& stage, const String& picker_source
 		if(insert < 0) throw Exc("The Picker package's file list could not be recognized. Its current files were left unchanged.");
 		for(int i = 0; i < files.GetCount(); ++i) {
 			String name = AsString(files.GetKey(i));
-			if(name.StartsWith("icons_") && name.EndsWith(".h") && package_before.Find("Generated/" + name) < 0) {
+			if((name == "SearchTags.h" || name == "RenderVariants.h" || name.StartsWith("icons_") && name.EndsWith(".h")) && package_before.Find("Generated/" + name) < 0) {
 				String entry = "\tGenerated/" + name + ",\n"; package_after.Insert(insert, entry); insert += entry.GetCount();
 			}
 		}

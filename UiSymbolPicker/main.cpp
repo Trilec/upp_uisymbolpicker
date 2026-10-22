@@ -6,9 +6,23 @@ using namespace Upp;
 
 GUI_APP_MAIN
 {
+	UiTheme::Set(UiThemePreset::Olive, UiThemeMode::Light);
 	SymbolPickerApp app;
 	String error;
 	const Vector<String>& args = CommandLine();
+	if(args.GetCount() == 3 && args[0] == "--prepare-variants") {
+		SymbolPickerMaintenanceJob job; ValueMap report; String header;
+		try {
+			Vector<SymbolPickerSourceRow> rows; GetSymbolPickerSourceRows(rows);
+			bool ok = BuildSymbolPickerRenderVariants(rows, args[1], job, header, report);
+			RealizeDirectory(args[2]);
+			if(!ok || !SaveFile(AppendFileName(args[2], "RenderVariants.h"), header)) throw Exc("No optical/fill variants were found or could be written.");
+			report.Set("ok", true); SaveFile(AppendFileName(args[2], "variant-report.json"), AsJSON(report, true));
+			SetExitCode(0);
+		}
+		catch(const Exc& error) { RealizeDirectory(args[2]); SaveFile(AppendFileName(args[2], "variant-error.txt"), error); SetExitCode(1); }
+		return;
+	}
 	if(args.GetCount() >= 3 && (args[0] == "--compare-material" || args[0] == "--scan-usage" || args[0] == "--download-material" || args[0] == "--install-refresh")) {
 		SymbolPickerMaintenanceJob job;
 		SymbolPickerMaintenanceResult result;
